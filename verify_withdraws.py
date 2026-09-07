@@ -172,21 +172,11 @@ def verify_one(cur, withdraw_id, verbose=True):
         return {"id": withdraw_id, "status": "unknown_type",
                 "type_id": type_id, "amount": w['amount']}
 
-    # 拉 user/school 名下所有提现/退回日志，再本地匹配
-    sql = f"""
-        SELECT id, type_id, amount, withdraw_amount, balance, msg,
-               rel_id, log_group, created_at
-        FROM {log_table}
-        WHERE {log_pk} = %s AND type_id IN (%s, %s)
-        ORDER BY created_at DESC
-    """
-    cur.execute(sql, (log_id_col, type_withdraw, type_return))
-    rows = cur.fetchall()
-
-    # 统计本提现是该 user/school 名下（同 type_id）的第几次提现
+    # 统计本提现是该 user/school 名下（同 type_id）的第几次提现，并定位上一次提现
     seq_col = 'user_id' if type_id == 1 else 'school_id'
     cur.execute("""
-        SELECT id FROM de_point_withdraws
+        SELECT id, created_at, amount, balance
+        FROM de_point_withdraws
         WHERE type_id = %s AND %s = %s AND deleted_at IS NULL
         ORDER BY created_at ASC, id ASC
     """ % ("%s", seq_col, "%s"), (type_id, log_id_col))
@@ -195,54 +185,86 @@ def verify_one(cur, withdraw_id, verbose=True):
     withdraw_seq = seq_ids.index(withdraw_id) + 1 if withdraw_id in seq_ids else None
     withdraw_total = len(seq_ids)
 
-    # 1) rel_id 精确匹配
-    by_rel = [r for r in rows if r['rel_id'] is not None and str(r['rel_id']) == str(withdraw_id)]
-    # 2) 金额匹配兜底
-    by_amt = []
-    for r in rows:
-        for col in ('withdraw_amount', 'amount'):
-            v = r.get(col)
-            if v is not None and abs(int(v)) == abs(int(w['amount'])):
-                by_amt.append(r); break
-    # 3) 时间窗口兜底（±10 分钟内，仅提现类型）
-    near_time = []
-    if w['created_at']:
-        cur.execute(f"""
+    # 定位上一次提现（同 user/school、同 type_id、created_at < 当前）
+    cur.execute("""
+        SELECT id, created_at, amount, balance
+        FROM de_point_withdraws
+        WHERE type_id = %s AND %s = %s AND deleted_at IS NULL
+          AND created_at < %s
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+    """ % ("%s", seq_col, "%s", "%s"), (type_id, log_id_col, w['created_at']))
+    prev_w = cur.fetchone()
+    prev_created_at = prev_w['created_at'] if prev_w else None
+    prev_withdraw_id = prev_w['id'] if prev_w else None
+
+    # 拉取上一次提现 ~ 本次提现 之间的所有流水明细（全部 type_id）
+    if prev_created_at:
+        sql = f"""
             SELECT id, type_id, amount, withdraw_amount, balance, msg,
                    rel_id, log_group, created_at
             FROM {log_table}
-            WHERE {log_pk} = %s AND type_id = %s
-              AND created_at BETWEEN %s AND %s
-            ORDER BY created_at DESC
-        """, (log_id_col, type_withdraw,
-              str(w['created_at']),
-              (w['created_at'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(w['created_at'], 'strftime') else str(w['created_at']))))
-        # 简化处理：直接用 rows 过滤
-        near_time = [r for r in rows
-                     if int(r['type_id']) == type_withdraw
-                     and r['created_at'] is not None
-                     and w['created_at'] is not None
-                     and abs((r['created_at'] - w['created_at']).total_seconds()) <= 600]
+            WHERE {log_pk} = %s
+              AND created_at > %s
+              AND created_at <= %s
+            ORDER BY created_at ASC, id ASC
+        """
+        cur.execute(sql, (log_id_col, prev_created_at, w['created_at']))
+    else:
+        # 没有上一次提现：取本次提现之前（含）的全部流水
+        sql = f"""
+            SELECT id, type_id, amount, withdraw_amount, balance, msg,
+                   rel_id, log_group, created_at
+            FROM {log_table}
+            WHERE {log_pk} = %s
+              AND created_at <= %s
+            ORDER BY created_at ASC, id ASC
+        """
+        cur.execute(sql, (log_id_col, w['created_at']))
+    detail_rows = cur.fetchall()
 
-    matched = by_rel or by_amt or near_time
-    source = ("rel_id 精确匹配" if by_rel
-              else "金额匹配" if by_amt
-              else "时间窗口±10分钟" if near_time
-              else "无匹配")
+    # 单独取本次提现对应的扣款日志（rel_id 精确匹配）
+    sql = f"""
+        SELECT id, type_id, amount, withdraw_amount, balance, msg,
+               rel_id, log_group, created_at
+        FROM {log_table}
+        WHERE {log_pk} = %s AND type_id IN (%s, %s)
+          AND rel_id = %s
+        ORDER BY created_at DESC
+    """
+    cur.execute(sql, (log_id_col, type_withdraw, type_return, withdraw_id))
+    withdraw_logs = cur.fetchall()
 
-    # 计算净扣款 = 提现(扣,正) - 退回(加,正)
-    net_debit = 0
-    for r in matched:
+    # 计算两次提现之间的流水净收入（仅非提现/退回类流水）
+    # 收入类(amount>0)累加，支出类(amount<0)累加
+    # 提现扣款(type=5/11)和提现退回(type=12)是边界事件，不计入收入/支出
+    income_total = 0   # 收入合计(正)
+    expense_total = 0  # 支出合计(正，取绝对值)
+    for r in detail_rows:
         a = int(r['amount'] or 0)
         t = int(r['type_id'])
-        if t == type_withdraw:
-            net_debit += abs(a) if a < 0 else a   # 提现是扣款
-        elif t == type_return:
-            net_debit -= abs(a) if a > 0 else a   # 退回是加回账户
+        if t == type_withdraw or t == type_return:
+            continue  # 跳过提现扣款/退回日志（边界事件，非业务收支）
+        if a > 0:
+            income_total += a
         else:
-            net_debit += a
+            expense_total += abs(a)
 
-    diff = int(w['amount']) - net_debit
+    # 净流水 = 收入 - 支出（仅业务收支，不含提现/退回）
+    net_flow = income_total - expense_total
+    # 本次提现金额
+    withdraw_amount = int(w['amount'])
+    # 本次提现后剩余余额(balance 字段是提现前的余额)
+    remaining_after = int(w['balance']) - withdraw_amount if w['balance'] is not None else 0
+    # 上次提现后剩余余额 = 上次提现时余额 - 上次提现金额
+    remaining_after_prev = 0
+    if prev_w:
+        remaining_after_prev = int(prev_w['balance'] or 0) - int(prev_w['amount'] or 0)
+
+    # 合理性：净流水 = (本次提现金额 + 本次剩余) - 上次剩余
+    # 即两次提现之间的收入应等于本次提现+本次剩余-上次剩余
+    expected = (withdraw_amount + (remaining_after if remaining_after > 0 else 0)) - remaining_after_prev
+    diff = net_flow - expected
     ok = (diff == 0)
 
     if verbose:
@@ -259,21 +281,55 @@ def verify_one(cur, withdraw_id, verbose=True):
         print(f"  提现时余额  : ¥{yuan(w['balance'])}   状态 state: {w['state']}")
         print(f"  created_at  : {w['created_at']}   out_trade_no: {w.get('out_trade_no')}")
         print(f"  reason      : {w.get('reason') or ''}")
+        if prev_w:
+            print(f"  上次提现    : ID={prev_withdraw_id}  created_at={prev_created_at}  "
+                  f"金额=¥{yuan(prev_w['amount'])}  余额=¥{yuan(prev_w['balance'])}")
+        else:
+            print(f"  上次提现    : 无（本次为首次提现）")
         print()
-        print(f"关联日志（{log_table}，{log_pk}={log_id_col}，type∈({type_withdraw}提现,{type_return}退回)）：")
-        print(f"  全部 {len(rows)} 条；匹配本提现 {len(matched)} 条 -> 来源: {source}")
-        if matched:
-            print(f"  {'log_id':>10} | {'type':<10} | {'amount':>10} | {'balance':>10} | {'rel_id':>10} | created_at          | msg")
+
+        # 流水明细
+        print(f"流水明细（{log_table}，{log_pk}={log_id_col}，从上次提现到本次提现，共 {len(detail_rows)} 条）")
+        print("-" * 110)
+        print(f"  {'log_id':>10} | {'type_id':>7} | {'type':<22} | {'amount':>12} | {'balance':>12} | {'created_at':<23} | {'rel_id':>10} | msg")
+        print("-" * 110)
+        for r in detail_rows:
+            t = int(r['type_id'])
+            tn = lookup.get(t, f"type{t}")
+            # 标记本次提现扣款
+            mark = " <- 本次提现" if (r['rel_id'] is not None and str(r['rel_id']) == str(withdraw_id)) else ""
+            msg = (r.get('msg') or '').replace('\n', ' ')[:40] + mark
+            print(f"  {r['id']:>10} | {t:>7} | {tn:<22} | "
+                  f"¥{yuan(r['amount']):>11} | ¥{yuan(r['balance']):>11} | "
+                  f"{str(r['created_at']):<23} | {str(r['rel_id']):>10} | {msg}")
+        print("-" * 110)
+        print(f"  收入合计   : ¥{yuan(income_total)}    支出合计: ¥{yuan(expense_total)}    "
+              f"(仅业务收支，不含提现扣款/退回)")
+        print()
+
+        # 本次提现对应的扣款日志
+        print(f"本次提现扣款日志（rel_id={withdraw_id}，共 {len(withdraw_logs)} 条）")
+        if withdraw_logs:
+            print(f"  {'log_id':>10} | {'type':<10} | {'amount':>10} | {'balance':>10} | created_at          | msg")
             print("  " + "-" * 88)
-            for r in matched:
+            for r in withdraw_logs:
                 tn = lookup.get(int(r['type_id']), f"type{r['type_id']}")
                 msg = (r.get('msg') or '').replace('\n', ' ')[:50]
-                print(f"  {r['id']:>10} | {tn:<10} | ¥{yuan(r['amount']):>9} | ¥{yuan(r['balance']):>9} | {str(r['rel_id']):>10} | {r['created_at']} | {msg}")
+                print(f"  {r['id']:>10} | {tn:<10} | ¥{yuan(r['amount']):>9} | ¥{yuan(r['balance']):>9} | {r['created_at']} | {msg}")
+        else:
+            print("  （未找到 rel_id 精确匹配的扣款日志）")
         print()
-        print(f"  提现记录金额          : {w['amount']} 分 = ¥{yuan(w['amount'])}")
-        print(f"  匹配日志净扣款(提现-退回): {net_debit} 分 = ¥{yuan(net_debit)}")
-        print(f"  差异                 : {diff} 分 = ¥{yuan(diff)}")
-        print(f"  结论                 : {'✓ 合理（一致）' if ok else '✗ 异常（不一致）'}")
+
+        # 合理性核对
+        print("合理性核对")
+        print("-" * 70)
+        print(f"  两次提现之间净流水(收入-支出)          : ¥{yuan(net_flow)}")
+        print(f"  本次提现金额                            : ¥{yuan(withdraw_amount)}")
+        print(f"  本次提现后剩余余额                      : ¥{yuan(remaining_after) if remaining_after > 0 else '0.00'}")
+        print(f"  上次提现后剩余余额                      : ¥{yuan(remaining_after_prev)}")
+        print(f"  期望值(本次提现+本次剩余-上次剩余)       : ¥{yuan(expected)}")
+        print(f"  差异(净流水 - 期望值)                    : ¥{yuan(diff)}")
+        print(f"  结论                                   : {'✓ 合理（一致）' if ok else '✗ 异常（不一致）'}")
         print()
 
     return {
@@ -281,17 +337,19 @@ def verify_one(cur, withdraw_id, verbose=True):
         "status": "ok" if ok else "mismatch",
         "type_id": type_id,
         "amount": int(w['amount']),
-        "net_debit": net_debit,
+        "net_flow": net_flow,
+        "expected": expected,
         "diff": diff,
-        "match_source": source,
-        "match_count": len(matched),
-        "log_total": len(rows),
+        "income_total": income_total,
+        "expense_total": expense_total,
+        "detail_count": len(detail_rows),
+        "prev_withdraw_id": prev_withdraw_id,
+        "withdraw_seq": withdraw_seq,
+        "withdraw_total": withdraw_total,
         "state": int(w['state']),
         "user_name": w.get('user_name'),
         "user_id": w.get('user_id'),
         "school_id": w.get('school_id'),
-        "withdraw_seq": withdraw_seq,
-        "withdraw_total": withdraw_total,
     }
 
 
@@ -369,7 +427,7 @@ def main():
     print("汇总")
     print("=" * 100)
     print(f"{'id':>8} | {'type':<6} | {'user/school':<14} | {'第N次':>8} | {'state':>5} | "
-          f"{'amount':>10} | {'net_debit':>10} | {'diff':>8} | {'match':<14} | {'cnt':>4} | 结论")
+          f"{'amount':>10} | {'net_flow':>10} | {'diff':>8} | {'明细数':>6} | 结论")
     print("-" * 110)
     n_ok = n_bad = n_err = n_nf = 0
     for r in results:
@@ -391,9 +449,8 @@ def main():
                     if r.get('withdraw_seq') else "-")
         print(f"{r['id']:>8} | {('个人' if r.get('type_id')==1 else '校区' if r.get('type_id')==2 else '?'):<6} | "
               f"{us:<14} | {seq_disp:>8} | {str(r.get('state','')):>5} | "
-              f"¥{yuan(r.get('amount',0)):>9} | ¥{yuan(r.get('net_debit',0) or 0):>9} | "
-              f"¥{yuan(r.get('diff',0) or 0):>7} | {r.get('match_source','-'):<14} | "
-              f"{str(r.get('match_count','')):>4} | {tag}")
+              f"¥{yuan(r.get('amount',0)):>9} | ¥{yuan(r.get('net_flow',0) or 0):>9} | "
+              f"¥{yuan(r.get('diff',0) or 0):>7} | {str(r.get('detail_count','')):>6} | {tag}")
 
     print("-" * 100)
     print(f"合计 {len(results)} 条  |  合理 {n_ok}  |  异常 {n_bad}  |  未找到 {n_nf}  |  错误 {n_err}")
@@ -405,8 +462,9 @@ def main():
         print("⚠ 异常 ID 列表：")
         for r in bad:
             print(f"  ID={r['id']}  diff=¥{yuan(r.get('diff',0) or 0)}  "
-                  f"amount=¥{yuan(r.get('amount',0))}  net_debit=¥{yuan(r.get('net_debit',0) or 0)}  "
-                  f"source={r.get('match_source')}")
+                  f"amount=¥{yuan(r.get('amount',0))}  net_flow=¥{yuan(r.get('net_flow',0) or 0)}  "
+                  f"expected=¥{yuan(r.get('expected',0) or 0)}  "
+                  f"prev={r.get('prev_withdraw_id')}")
         print()
 
     cur.close(); conn.close(); transport.close()

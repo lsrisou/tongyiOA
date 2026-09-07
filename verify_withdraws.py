@@ -183,6 +183,18 @@ def verify_one(cur, withdraw_id, verbose=True):
     cur.execute(sql, (log_id_col, type_withdraw, type_return))
     rows = cur.fetchall()
 
+    # 统计本提现是该 user/school 名下（同 type_id）的第几次提现
+    seq_col = 'user_id' if type_id == 1 else 'school_id'
+    cur.execute("""
+        SELECT id FROM de_point_withdraws
+        WHERE type_id = %s AND %s = %s AND deleted_at IS NULL
+        ORDER BY created_at ASC, id ASC
+    """ % ("%s", seq_col, "%s"), (type_id, log_id_col))
+    seq_rows = cur.fetchall()
+    seq_ids = [r['id'] for r in seq_rows]
+    withdraw_seq = seq_ids.index(withdraw_id) + 1 if withdraw_id in seq_ids else None
+    withdraw_total = len(seq_ids)
+
     # 1) rel_id 精确匹配
     by_rel = [r for r in rows if r['rel_id'] is not None and str(r['rel_id']) == str(withdraw_id)]
     # 2) 金额匹配兜底
@@ -239,6 +251,8 @@ def verify_one(cur, withdraw_id, verbose=True):
         print("=" * 92)
         kind = "个人提现" if type_id == 1 else "校区提现"
         print(f"  类型        : type_id={type_id} ({kind})")
+        seq_str = f"第 {withdraw_seq} 次提现（共 {withdraw_total} 次）" if withdraw_seq else "第 ? 次提现"
+        print(f"  提现次序    : {seq_str}")
         print(f"  {log_pk:<10}: {log_id_col}  用户/姓名: {w.get('user_name')}  手机: {w.get('phone')}")
         print(f"  提现金额    : {w['amount']} 分 = ¥{yuan(w['amount'])}")
         print(f"  手续费 fee  : {w['fee']} 分 = ¥{yuan(w['fee'])}   实际到账 send_amount: ¥{yuan(w['send_amount'])}")
@@ -276,6 +290,8 @@ def verify_one(cur, withdraw_id, verbose=True):
         "user_name": w.get('user_name'),
         "user_id": w.get('user_id'),
         "school_id": w.get('school_id'),
+        "withdraw_seq": withdraw_seq,
+        "withdraw_total": withdraw_total,
     }
 
 
@@ -352,9 +368,9 @@ def main():
     print("\n" + "=" * 100)
     print("汇总")
     print("=" * 100)
-    print(f"{'id':>8} | {'type':<6} | {'user/school':<14} | {'state':>5} | "
+    print(f"{'id':>8} | {'type':<6} | {'user/school':<14} | {'第N次':>8} | {'state':>5} | "
           f"{'amount':>10} | {'net_debit':>10} | {'diff':>8} | {'match':<14} | {'cnt':>4} | 结论")
-    print("-" * 100)
+    print("-" * 110)
     n_ok = n_bad = n_err = n_nf = 0
     for r in results:
         st = r.get('status')
@@ -371,8 +387,10 @@ def main():
         us = r.get('school_id') or r.get('user_id') or ''
         us = f"u{r['user_id']}" if r.get('type_id') == 1 and r.get('user_id') else (
              f"s{r['school_id']}" if r.get('type_id') == 2 and r.get('school_id') else str(us))
+        seq_disp = (f"{r.get('withdraw_seq','?')}/{r.get('withdraw_total','?')}"
+                    if r.get('withdraw_seq') else "-")
         print(f"{r['id']:>8} | {('个人' if r.get('type_id')==1 else '校区' if r.get('type_id')==2 else '?'):<6} | "
-              f"{us:<14} | {str(r.get('state','')):>5} | "
+              f"{us:<14} | {seq_disp:>8} | {str(r.get('state','')):>5} | "
               f"¥{yuan(r.get('amount',0)):>9} | ¥{yuan(r.get('net_debit',0) or 0):>9} | "
               f"¥{yuan(r.get('diff',0) or 0):>7} | {r.get('match_source','-'):<14} | "
               f"{str(r.get('match_count','')):>4} | {tag}")

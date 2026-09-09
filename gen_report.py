@@ -58,12 +58,6 @@ def main():
             "AND l.start_time>=%s AND l.start_time<%s" % (T_START, T_END))
     comp = base + " AND l.star_confirm=1"
 
-    # 数据质量: 同时统计作废占位记录数,用于报告说明
-    cur.execute(f"""SELECT COUNT(*) FROM de_student_hour_lessons l
-        WHERE l.lesson_type=1 AND l.deleted_at IS NULL AND l.state=2
-        AND l.start_time>=%s AND l.start_time<%s""", (T_START, T_END))
-    void_cnt = cur.fetchone()[0]
-
     # ===== 1. 正式课 上课数 / 完课数 (按次数 & 课时) =====
     cur.execute(f"""
         SELECT COUNT(*), COALESCE(SUM(l.hour_count),0)
@@ -285,10 +279,6 @@ def main():
       <div class="card" style="background:linear-gradient(135deg,#7c3aed,#a855f7)">
         <div class="t">完课率（按课时）</div><div class="v">{done_rate_hr:.1f}<span class="u">%</span></div></div>
     </div>
-    <div class="note"><b>口径：</b>正式课 = <code>lesson_type=1</code>；有效课 = <code>state=1</code>（已排除排课后取消/作废的占位记录）；
-      完课 = <code>star_confirm=1</code>；统计区间以 <code>start_time</code>（Unix时间戳）落入 [{T_START}, {T_END}) 为准；已排除软删除（<code>deleted_at IS NULL</code>）。
-      <b>数据质量：</b>同区间另有 <b>{fnum(void_cnt)}</b> 条 <code>state=2</code> 的作废占位记录（均 <code>hour_count=0</code>、无课时无费用），已全部排除；
-      <code>state=1</code> 内业务键（学生+老师+开始时间）经校验<b>完全唯一、无重复</b>。</div>
   </section>
 
   <section>
@@ -299,19 +289,12 @@ def main():
       <thead><tr><th>教练等级</th><th>排课次数</th><th>排课课时</th><th>次数占比</th><th>课时占比</th><th>次数分布</th></tr></thead>
       <tbody>{lvl_trs}</tbody>
     </table>
-    <div class="note"><b>口径：</b>排课 = 正式课全部记录（含未完课）；教练等级取自 <code>de_teacher_level_statuses.teach_level</code>，
-      按 <code>teacher_id = id</code> 关联；等级映射：0=助教, 10=教练, 20=银牌, 30=金牌, 35=白金, 40=王牌, 43=钻石, 45=初级专家, 50=高级专家, 60=特级专家。</div>
 
     <h3 style="margin:24px 0 10px;font-size:15px;color:#374151;">2.2 好评率</h3>
     <div class="mini-row">{praise_cards}</div>
-    <div class="note"><b>口径：</b>好评率 = star=5 的完课数 ÷ 已评价（star&gt;0）完课数 × 100%；评价取值仅 1/3/5。
-      本区间内完课记录均已产生评价。</div>
 
     <h3 style="margin:24px 0 10px;font-size:15px;color:#374151;">2.3 课时费 & 总部收入</h3>
     <div class="mini-row" style="grid-template-columns:repeat(4,1fr);">{fee_cards}</div>
-    <div class="note"><b>口径：</b>金额单位为「元」，由数据库积分/分字段 ÷100 换算。
-      <b>课时费</b> = <code>SUM(teacher_point)</code>（教师课时费）；
-      <b>总部收入</b> = <code>SUM(agent_point)</code>（平台/代理佣金收入，仅含存在代理佣金的完课记录）。</div>
   </section>
 
   <section>
@@ -339,9 +322,6 @@ def main():
         </tr>"""
     html_doc += ctr_body + f"""</tbody>
     </table>
-    <div class="note"><b>口径：</b>按 <code>teach_school_id</code> 关联 <code>de_schools.id</code> 取 <code>name</code>；
-      以完课课时（<code>star_confirm=1</code> 且 <code>lesson_type=1</code> 的 <code>SUM(hour_count)</code>）降序排行；
-      课时占比 = 该中心完课课时 ÷ 全部完课课时。</div>
   </section>
 
   <div style="text-align:center;color:#9ca3af;font-size:12px;padding:8px 0 20px;">

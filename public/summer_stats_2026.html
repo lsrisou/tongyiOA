@@ -60,7 +60,7 @@
   <div class="head">
     <h1>暑假正式课统计报告</h1>
     <div class="sub">统计区间：2026年07月15日 — 2026年09月01日 （有效正式课 63,594 节）</div>
-    <div class="meta">数据来源：deshengoa 库 / de_student_hour_lessons · de_schools · de_teacher_level_statuses ｜ 报告生成时间：2026-09-09 03:54:20</div>
+    <div class="meta">数据来源：deshengoa 库 / de_student_hour_lessons · de_schools · de_teacher_level_statuses ｜ 报告生成时间：2026-09-09 04:13:09</div>
   </div>
 
   <section>
@@ -79,10 +79,6 @@
       <div class="card" style="background:linear-gradient(135deg,#7c3aed,#a855f7)">
         <div class="t">完课率（按课时）</div><div class="v">99.7<span class="u">%</span></div></div>
     </div>
-    <div class="note"><b>口径：</b>正式课 = <code>lesson_type=1</code>；有效课 = <code>state=1</code>（已排除排课后取消/作废的占位记录）；
-      完课 = <code>star_confirm=1</code>；统计区间以 <code>start_time</code>（Unix时间戳）落入 [1784073600, 1788220800) 为准；已排除软删除（<code>deleted_at IS NULL</code>）。
-      <b>数据质量：</b>同区间另有 <b>16,310</b> 条 <code>state=2</code> 的作废占位记录（均 <code>hour_count=0</code>、无课时无费用），已全部排除；
-      <code>state=1</code> 内业务键（学生+老师+开始时间）经校验<b>完全唯一、无重复</b>。</div>
   </section>
 
   <section>
@@ -173,8 +169,6 @@
           <td class="bar-cell"><div class="bar" style="width:0.0%"></div></td>
         </tr></tbody>
     </table>
-    <div class="note"><b>口径：</b>排课 = 正式课全部记录（含未完课）；教练等级取自 <code>de_teacher_level_statuses.teach_level</code>，
-      按 <code>teacher_id = id</code> 关联；等级映射：0=助教, 10=教练, 20=银牌, 30=金牌, 35=白金, 40=王牌, 43=钻石, 45=初级专家, 50=高级专家, 60=特级专家。</div>
 
     <h3 style="margin:24px 0 10px;font-size:15px;color:#374151;">2.2 好评率</h3>
     <div class="mini-row">
@@ -184,8 +178,6 @@
         <div class="mini-card"><div class="mini-label">中评数(star=3)</div><div class="mini-val">4,367</div></div>
         <div class="mini-card"><div class="mini-label">差评数(star=1)</div><div class="mini-val">0</div></div>
         <div class="mini-card hl2"><div class="mini-label">好评率</div><div class="mini-val">93.1%</div></div></div>
-    <div class="note"><b>口径：</b>好评率 = star=5 的完课数 ÷ 已评价（star&gt;0）完课数 × 100%；评价取值仅 1/3/5。
-      本区间内完课记录均已产生评价。</div>
 
     <h3 style="margin:24px 0 10px;font-size:15px;color:#374151;">2.3 课时费 & 总部收入</h3>
     <div class="mini-row" style="grid-template-columns:repeat(4,1fr);">
@@ -193,9 +185,6 @@
         <div class="mini-card"><div class="mini-label">平均课时费</div><div class="mini-val">136.12<span class="unit">元/课时</span></div></div>
         <div class="mini-card hl2"><div class="mini-label">总部/平台收入</div><div class="mini-val">16,183.42<span class="unit">元</span></div></div>
         <div class="mini-card"><div class="mini-label">平均总部收入</div><div class="mini-val">0.22<span class="unit">元/课时</span></div></div></div>
-    <div class="note"><b>口径：</b>金额单位为「元」，由数据库积分/分字段 ÷100 换算。
-      <b>课时费</b> = <code>SUM(teacher_point)</code>（教师课时费）；
-      <b>总部收入</b> = <code>SUM(agent_point)</code>（平台/代理佣金收入，仅含存在代理佣金的完课记录）。</div>
   </section>
 
   <section>
@@ -934,13 +923,10 @@
           <td class="bar-cell"><div class="bar bar-g" style="width:0.0%"></div></td>
         </tr></tbody>
     </table>
-    <div class="note"><b>口径：</b>按 <code>teach_school_id</code> 关联 <code>de_schools.id</code> 取 <code>name</code>；
-      以完课课时（<code>star_confirm=1</code> 且 <code>lesson_type=1</code> 的 <code>SUM(hour_count)</code>）降序排行；
-      课时占比 = 该中心完课课时 ÷ 全部完课课时。</div>
   </section>
 
   <div style="text-align:center;color:#9ca3af;font-size:12px;padding:8px 0 20px;">
-    本报告由数据统计脚本自动生成 · 2026-09-09 03:54:20
+    本报告由数据统计脚本自动生成 · 2026-09-09 04:13:09
   </div>
 </div>
 </body>

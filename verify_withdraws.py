@@ -283,7 +283,8 @@ def verify_one(cur, withdraw_id, verbose=True):
         print(f"  reason      : {w.get('reason') or ''}")
         if prev_w:
             print(f"  上次提现    : ID={prev_withdraw_id}  created_at={prev_created_at}  "
-                  f"金额=¥{yuan(prev_w['amount'])}  余额=¥{yuan(prev_w['balance'])}")
+                  f"金额=¥{yuan(prev_w['amount'])}  提现前余额=¥{yuan(prev_w['balance'])}  "
+                  f"剩余=¥{yuan(int(prev_w['balance'])-int(prev_w['amount']))}")
         else:
             print(f"  上次提现    : 无（本次为首次提现）")
         print()
@@ -344,6 +345,9 @@ def verify_one(cur, withdraw_id, verbose=True):
         "expense_total": expense_total,
         "detail_count": len(detail_rows),
         "prev_withdraw_id": prev_withdraw_id,
+        "prev_created_at": prev_created_at,
+        "prev_amount": int(prev_w['amount']) if prev_w else None,
+        "prev_balance": int(prev_w['balance']) if prev_w else None,
         "withdraw_seq": withdraw_seq,
         "withdraw_total": withdraw_total,
         "state": int(w['state']),
@@ -423,12 +427,13 @@ def main():
             results.append({"id": wid, "status": "error", "error": str(e)})
 
     # 汇总表
-    print("\n" + "=" * 100)
+    print("\n" + "=" * 130)
     print("汇总")
-    print("=" * 100)
+    print("=" * 130)
     print(f"{'id':>8} | {'type':<6} | {'user/school':<14} | {'第N次':>8} | {'state':>5} | "
-          f"{'amount':>10} | {'net_flow':>10} | {'diff':>8} | {'明细数':>6} | 结论")
-    print("-" * 110)
+          f"{'上次提现日期':<19} | {'上次金额':>10} | {'本次提现':>10} | "
+          f"{'净流水':>10} | {'diff':>8} | {'明细数':>6} | 结论")
+    print("-" * 130)
     n_ok = n_bad = n_err = n_nf = 0
     for r in results:
         st = r.get('status')
@@ -447,12 +452,15 @@ def main():
              f"s{r['school_id']}" if r.get('type_id') == 2 and r.get('school_id') else str(us))
         seq_disp = (f"{r.get('withdraw_seq','?')}/{r.get('withdraw_total','?')}"
                     if r.get('withdraw_seq') else "-")
+        prev_date = str(r.get('prev_created_at',''))[:19] if r.get('prev_created_at') else '(首次)'
+        prev_amt = f"¥{yuan(r.get('prev_amount',0) or 0)}" if r.get('prev_amount') is not None else '-'
         print(f"{r['id']:>8} | {('个人' if r.get('type_id')==1 else '校区' if r.get('type_id')==2 else '?'):<6} | "
               f"{us:<14} | {seq_disp:>8} | {str(r.get('state','')):>5} | "
+              f"{prev_date:<19} | {prev_amt:>10} | "
               f"¥{yuan(r.get('amount',0)):>9} | ¥{yuan(r.get('net_flow',0) or 0):>9} | "
               f"¥{yuan(r.get('diff',0) or 0):>7} | {str(r.get('detail_count','')):>6} | {tag}")
 
-    print("-" * 100)
+    print("-" * 130)
     print(f"合计 {len(results)} 条  |  合理 {n_ok}  |  异常 {n_bad}  |  未找到 {n_nf}  |  错误 {n_err}")
     print()
 
@@ -461,10 +469,11 @@ def main():
     if bad:
         print("⚠ 异常 ID 列表：")
         for r in bad:
+            prev_date = str(r.get('prev_created_at',''))[:19] if r.get('prev_created_at') else '(首次)'
             print(f"  ID={r['id']}  diff=¥{yuan(r.get('diff',0) or 0)}  "
                   f"amount=¥{yuan(r.get('amount',0))}  net_flow=¥{yuan(r.get('net_flow',0) or 0)}  "
                   f"expected=¥{yuan(r.get('expected',0) or 0)}  "
-                  f"prev={r.get('prev_withdraw_id')}")
+                  f"prev={r.get('prev_withdraw_id')}({prev_date})")
         print()
 
     cur.close(); conn.close(); transport.close()

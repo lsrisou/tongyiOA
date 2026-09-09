@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """暑假(2026-07-15 ~ 2026-09-01)正式课统计 - HTML报告生成器"""
 import datetime
+from datetime import timezone, timedelta
+
+# 服务器为UTC时区,报告需显示北京时间(Asia/Shanghai, UTC+8)
+CN_TZ = timezone(timedelta(hours=8))
 import html
 import os
 from sshdb import DBTunnel
@@ -136,7 +140,7 @@ def main():
     tunnel.close()
 
     # ============ 渲染 HTML ============
-    gen_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    gen_time = datetime.datetime.now(CN_TZ).strftime('%Y-%m-%d %H:%M:%S')
 
     # 概览卡片
     cards = [

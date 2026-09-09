@@ -106,7 +106,7 @@ def main():
     """)
     rr = cur.fetchone()
     rate_total, rated, star5, star3, star1, star0 = rr
-    praise_rate = (float(star3 + star5) / float(rated) * 100) if rated else 0
+    praise_rate = (float(star5) / float(rated) * 100) if rated else 0
 
     # 2c 课时费 & 总部收入 (完课)
     # 总部收入 = 总部教练课时抽成,来自 de_top_point_logs.amount(type_id=4),按 hour_lesson_id 关联
@@ -182,7 +182,7 @@ def main():
     max_ctr_hours = max((float(r[2]) for r in center_rows), default=1)
     for name, lessons, hours, tfee, s5, s3, sr in center_rows:
         hpct = float(hours) / center_total_hours * 100
-        pr = (float(s5 + s3) / float(sr) * 100) if sr else 0
+        pr = (float(s5) / float(sr) * 100) if sr else 0
         bar_w = float(hours) / max_ctr_hours * 100
         ctr_trs += f"""
         <tr>
@@ -202,7 +202,7 @@ def main():
         <div class="mini-card hl"><div class="mini-label">非常满意(star=5)</div><div class="mini-val">{fnum(star5)}</div></div>
         <div class="mini-card"><div class="mini-label">满意(star=3)</div><div class="mini-val">{fnum(star3)}</div></div>
         <div class="mini-card"><div class="mini-label">不满意(star=1)</div><div class="mini-val">{fnum(star1)}</div></div>
-        <div class="mini-card hl2"><div class="mini-label">好评率(满意及以上)</div><div class="mini-val">{praise_rate:.1f}%</div></div>"""
+        <div class="mini-card hl2"><div class="mini-label">好评率(非常满意)</div><div class="mini-val">{praise_rate:.1f}%</div></div>"""
 
     fee_cards = f"""
         <div class="mini-card hl"><div class="mini-label">课时费总额(教师)</div><div class="mini-val">{fmoney(teacher_fee)}<span class="unit">元</span></div></div>
@@ -318,7 +318,7 @@ def main():
     ctr_body = ''
     for i, (name, lessons, hours, tfee, s5, s3, sr) in enumerate(center_rows, 1):
         hpct = float(hours) / center_total_hours * 100
-        pr = (float(s5 + s3) / float(sr) * 100) if sr else 0
+        pr = (float(s5) / float(sr) * 100) if sr else 0
         bar_w = float(hours) / max_ctr_hours * 100
         rk = f'<span class="rank r{i}">{i}</span>' if i <= 3 else f'<span class="rank">{i}</span>'
         ctr_body += f"""

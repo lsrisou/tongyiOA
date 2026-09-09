@@ -277,47 +277,53 @@ def verify_one(cur, withdraw_id, verbose=True):
     ok = (diff == 0)
 
     if verbose:
-        print("=" * 92)
-        print(f"提现 ID = {withdraw_id}")
-        print("=" * 92)
+        print("=" * 100)
+        print(f"提现核对报告  ID = {withdraw_id}")
+        print("=" * 100)
+        print()
+        # 1. 提现记录
         kind = "个人提现" if type_id == 1 else "校区提现"
-        print(f"  类型        : type_id={type_id} ({kind})")
-        seq_str = f"第 {withdraw_seq} 次提现（共 {withdraw_total} 次）" if withdraw_seq else "第 ? 次提现"
-        print(f"  提现次序    : {seq_str}")
-        print(f"  {log_pk:<10}: {log_id_col}  用户/姓名: {w.get('user_name')}  手机: {w.get('phone')}")
-        print(f"  提现金额    : {w['amount']} 分 = ¥{yuan(w['amount'])}")
-        print(f"  手续费 fee  : {w['fee']} 分 = ¥{yuan(w['fee'])}   实际到账 send_amount: ¥{yuan(w['send_amount'])}")
-        print(f"  提现时余额  : ¥{yuan(w['balance'])}   状态 state: {w['state']}")
-        print(f"  created_at  : {w['created_at']}   out_trade_no: {w.get('out_trade_no')}")
-        print(f"  reason      : {w.get('reason') or ''}")
+        seq_str = f"第 {withdraw_seq}/{withdraw_total} 次" if withdraw_seq else "?"
+        print("【1. 提现记录】")
+        print("-" * 80)
+        print(f"  字段            | 值")
+        print(f"  ----------------+------------------------------------------")
+        print(f"  id              | {withdraw_id}")
+        print(f"  type_id         | {type_id} ({kind})")
+        print(f"  提现次序        | {seq_str}")
+        us_field = "user_id" if type_id == 1 else "school_id"
+        print(f"  {us_field:<15} | {log_id_col}  姓名: {w.get('user_name') or '-'}  手机: {w.get('phone') or '-'}")
+        print(f"  提现金额        | ¥{yuan(w['amount'])}")
+        print(f"  手续费 fee      | ¥{yuan(w['fee'])}    实际到账: ¥{yuan(w['send_amount'])}")
+        print(f"  提现时余额      | ¥{yuan(w['balance'])}")
+        print(f"  state           | {w['state']}  created_at: {w['created_at']}")
+        print(f"  out_trade_no   | {w.get('out_trade_no') or '-'}")
         if prev_w:
-            print(f"  上次提现    : ID={prev_withdraw_id}  created_at={prev_created_at}  "
-                  f"金额=¥{yuan(prev_w['amount'])}  提现前余额=¥{yuan(prev_w['balance'])}  "
-                  f"剩余=¥{yuan(int(prev_w['balance'])-int(prev_w['amount']))}")
+            print(f"  上次提现        | ID={prev_withdraw_id}  日期={prev_created_at}  "
+                  f"金额=¥{yuan(prev_w['amount'])}  剩余=¥{yuan(remaining_after_prev)}")
         else:
-            print(f"  上次提现    : 无（本次为首次提现）")
+            print(f"  上次提现        | 无（首次提现）")
         print()
 
-        # 流水明细
-        print(f"流水明细（{log_table}，{log_pk}={log_id_col}，从上次提现到本次提现，共 {len(detail_rows)} 条）")
-        print("-" * 110)
-        print(f"  {'log_id':>10} | {'type_id':>7} | {'type':<22} | {'amount':>12} | {'balance':>12} | {'created_at':<23} | {'rel_id':>10} | msg")
-        print("-" * 110)
+        # 2. 流水明细
+        print(f"【2. 流水明细】（{log_table}，{log_pk}={log_id_col}，共 {len(detail_rows)} 条）")
+        print("-" * 120)
+        print(f"  {'log_id':>10} | {'type_id':>7} | {'type':<20} | {'amount':>11} | {'balance':>11} | {'created_at':<23} | msg")
+        print("-" * 120)
         for r in detail_rows:
             t = int(r['type_id'])
             tn = lookup.get(t, f"type{t}")
-            # 标记本次提现扣款
             mark = " <- 本次提现" if (r['rel_id'] is not None and str(r['rel_id']) == str(withdraw_id)) else ""
             msg = (r.get('msg') or '').replace('\n', ' ')[:40] + mark
-            print(f"  {r['id']:>10} | {t:>7} | {tn:<22} | "
-                  f"¥{yuan(r['amount']):>11} | ¥{yuan(r['balance']):>11} | "
-                  f"{str(r['created_at']):<23} | {str(r['rel_id']):>10} | {msg}")
-        print("-" * 110)
+            print(f"  {r['id']:>10} | {t:>7} | {tn:<20} | "
+                  f"¥{yuan(r['amount']):>10} | ¥{yuan(r['balance']):>10} | "
+                  f"{str(r['created_at']):<23} | {msg}")
+        print("-" * 120)
+        print()
 
-        # 时序余额分析：按日聚合，展示收支走向和余额变化
-        # 起始余额 = 上次提现后剩余（若首次提现则为 0）
+        # 3. 时序余额分析
         start_balance = remaining_after_prev
-        print(f"时序余额分析（按日聚合，起始余额 ¥{yuan(start_balance)}）")
+        print(f"【3. 时序余额分析】（按日聚合，起始余额 ¥{yuan(start_balance)}）")
         print("-" * 100)
         print(f"  {'日期':<10} | {'收入':>12} | {'支出':>12} | {'当日净额':>12} | {'日终余额':>12} | {'笔数':>5} | 备注")
         print("-" * 100)
@@ -369,8 +375,9 @@ def verify_one(cur, withdraw_id, verbose=True):
             print(f"  ✓ 余额始终为正，支出均从累计收入中正常扣除")
         print()
 
-        print(f"  收入合计   : ¥{yuan(income_total)}    支出合计: ¥{yuan(expense_total)}    "
-              f"(仅业务收支，不含提现扣款/退回)")
+        # 4. 收支分类
+        print(f"【4. 收支分类】（仅业务收支，不含提现扣款/退回）")
+        print(f"  收入合计: ¥{yuan(income_total)}    支出合计: ¥{yuan(expense_total)}")
         # 收入分类小计
         if income_by_type:
             print(f"  收入分类小计（{len(income_by_type)} 类）：")
@@ -387,8 +394,8 @@ def verify_one(cur, withdraw_id, verbose=True):
                 print(f"    - {tn:<22} : ¥{yuan(total):>11}  ({cnt} 笔, 占 {pct:.1f}%)")
         print()
 
-        # 本次提现对应的扣款日志
-        print(f"本次提现扣款日志（rel_id={withdraw_id}，共 {len(withdraw_logs)} 条）")
+        # 5. 本次提现扣款日志
+        print(f"【5. 本次提现扣款日志】（rel_id={withdraw_id}，共 {len(withdraw_logs)} 条）")
         if withdraw_logs:
             print(f"  {'log_id':>10} | {'type':<10} | {'amount':>10} | {'balance':>10} | created_at          | msg")
             print("  " + "-" * 88)
@@ -400,16 +407,16 @@ def verify_one(cur, withdraw_id, verbose=True):
             print("  （未找到 rel_id 精确匹配的扣款日志）")
         print()
 
-        # 合理性核对
-        print("合理性核对")
+        # 6. 合理性核对
+        print("【6. 合理性核对】")
         print("-" * 70)
-        print(f"  两次提现之间净流水(收入-支出)          : ¥{yuan(net_flow)}")
-        print(f"  本次提现金额                            : ¥{yuan(withdraw_amount)}")
-        print(f"  本次提现后剩余余额                      : ¥{yuan(remaining_after) if remaining_after > 0 else '0.00'}")
-        print(f"  上次提现后剩余余额                      : ¥{yuan(remaining_after_prev)}")
-        print(f"  期望值(本次提现+本次剩余-上次剩余)       : ¥{yuan(expected)}")
-        print(f"  差异(净流水 - 期望值)                    : ¥{yuan(diff)}")
-        print(f"  结论                                   : {'✓ 合理（一致）' if ok else '✗ 异常（不一致）'}")
+        print(f"  净流水(收入-支出)                  : ¥{yuan(net_flow)}")
+        print(f"  本次提现金额                      : ¥{yuan(withdraw_amount)}")
+        print(f"  本次提现后剩余余额                : ¥{yuan(remaining_after) if remaining_after > 0 else '0.00'}")
+        print(f"  上次提现后剩余余额                : ¥{yuan(remaining_after_prev)}")
+        print(f"  期望值(本次提现+本次剩余-上次剩余) : ¥{yuan(expected)}")
+        print(f"  差异(净流水 - 期望值)              : ¥{yuan(diff)}")
+        print(f"  结论                               : {'✓ 合理（一致）' if ok else '✗ 异常（不一致）'}")
         print()
 
     return {

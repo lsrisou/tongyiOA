@@ -11,10 +11,10 @@ DATE_END = datetime.datetime(2026, 9, 1, 0, 0, 0)
 T_START = int(DATE_START.timestamp())
 T_END = int(DATE_END.timestamp())
 
-# 教练等级标签
+# 教练等级标签(按业务定义)
 LEVEL_LABEL = {
-    0: '等级0(未评级/见习)', 10: '等级10', 20: '等级20', 30: '等级30',
-    35: '等级35', 40: '等级40', 43: '等级43', 45: '等级45', 50: '等级50', 60: '等级60',
+    0: '助教', 10: '教练', 20: '银牌教练', 30: '金牌教练', 35: '白金教练',
+    40: '王牌教练', 43: '钻石教练', 45: '初级专家', 50: '高级专家', 60: '特级专家',
 }
 
 
@@ -300,7 +300,7 @@ def main():
       <tbody>{lvl_trs}</tbody>
     </table>
     <div class="note"><b>口径：</b>排课 = 正式课全部记录（含未完课）；教练等级取自 <code>de_teacher_level_statuses.teach_level</code>，
-      按 <code>teacher_id = id</code> 关联；等级 0 表示未评级/见习教练。</div>
+      按 <code>teacher_id = id</code> 关联；等级映射：0=助教, 10=教练, 20=银牌, 30=金牌, 35=白金, 40=王牌, 43=钻石, 45=初级专家, 50=高级专家, 60=特级专家。</div>
 
     <h3 style="margin:24px 0 10px;font-size:15px;color:#374151;">2.2 好评率</h3>
     <div class="mini-row">{praise_cards}</div>

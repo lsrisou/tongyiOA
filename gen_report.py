@@ -196,13 +196,11 @@ def main():
         </tr>"""
 
     praise_cards = f"""
-        <div class="mini-card"><div class="mini-label">完课总数</div><div class="mini-val">{fnum(rate_total)}</div></div>
         <div class="mini-card"><div class="mini-label">已评价数</div><div class="mini-val">{fnum(rated)}</div></div>
-        <div class="mini-card"><div class="mini-label">待评价(star=0)</div><div class="mini-val">{fnum(star0)}</div></div>
         <div class="mini-card hl"><div class="mini-label">非常满意(star=5)</div><div class="mini-val">{fnum(star5)}</div></div>
         <div class="mini-card"><div class="mini-label">满意(star=3)</div><div class="mini-val">{fnum(star3)}</div></div>
-        <div class="mini-card"><div class="mini-label">不满意(star=1)</div><div class="mini-val">{fnum(star1)}</div></div>
-        <div class="mini-card hl2"><div class="mini-label">好评率(非常满意)</div><div class="mini-val">{praise_rate:.1f}%</div></div>"""
+        <div class="mini-card hl2"><div class="mini-label">好评率(非常满意)</div><div class="mini-val">{praise_rate:.1f}%</div></div>
+        <div class="formula">好评率 = 非常满意数 ÷ 已评价数 × 100% = {fnum(star5)} ÷ {fnum(rated)} × 100% = {praise_rate:.1f}%</div>"""
 
     fee_cards = f"""
         <div class="mini-card hl"><div class="mini-label">课时费总额(教师)</div><div class="mini-val">{fmoney(teacher_fee)}<span class="unit">元</span></div></div>
@@ -243,6 +241,7 @@ def main():
   .mini-card{{background:#f9fafb;border:1px solid var(--bd);border-radius:10px;padding:14px 12px;text-align:center;}}
   .mini-card.hl{{background:#ecfdf5;border-color:#a7f3d0;}}
   .mini-card.hl2{{background:#eff6ff;border-color:#bfdbfe;}}
+  .formula{{margin-top:14px;padding:12px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:14px;color:#92400e;text-align:center;}}
   .mini-label{{font-size:12px;color:var(--mut);}}
   .mini-val{{font-size:22px;font-weight:700;margin-top:4px;}}
   .mini-val .unit{{font-size:12px;font-weight:600;color:var(--mut);margin-left:3px;}}

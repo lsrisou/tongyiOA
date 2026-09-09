@@ -10,8 +10,9 @@ import os
 from sshdb import DBTunnel
 
 # ---- 时间口径 ----
-DATE_START = datetime.datetime(2026, 7, 15, 0, 0, 0)
-DATE_END = datetime.datetime(2026, 9, 1, 0, 0, 0)
+# 服务器为UTC时区,datetime 默认按UTC解释,需显式指定北京时间(UTC+8)
+DATE_START = datetime.datetime(2026, 7, 15, 0, 0, 0, tzinfo=CN_TZ)
+DATE_END = datetime.datetime(2026, 9, 1, 0, 0, 0, tzinfo=CN_TZ)
 T_START = int(DATE_START.timestamp())
 T_END = int(DATE_END.timestamp())
 

@@ -313,6 +313,62 @@ def verify_one(cur, withdraw_id, verbose=True):
                   f"¥{yuan(r['amount']):>11} | ¥{yuan(r['balance']):>11} | "
                   f"{str(r['created_at']):<23} | {str(r['rel_id']):>10} | {msg}")
         print("-" * 110)
+
+        # 时序余额分析：按日聚合，展示收支走向和余额变化
+        # 起始余额 = 上次提现后剩余（若首次提现则为 0）
+        start_balance = remaining_after_prev
+        print(f"时序余额分析（按日聚合，起始余额 ¥{yuan(start_balance)}）")
+        print("-" * 100)
+        print(f"  {'日期':<10} | {'收入':>12} | {'支出':>12} | {'当日净额':>12} | {'日终余额':>12} | {'笔数':>5} | 备注")
+        print("-" * 100)
+
+        # 按日聚合
+        from collections import OrderedDict
+        daily = OrderedDict()  # date_str -> [income, expense, count, min_balance, min_balance_row]
+        running = start_balance
+        min_running = running
+        min_row = None
+        for r in detail_rows:
+            a = int(r['amount'] or 0)
+            t = int(r['type_id'])
+            if t == type_withdraw or t == type_return:
+                continue  # 跳过提现扣款/退回
+            d = str(r['created_at'])[:10]
+            if d not in daily:
+                daily[d] = {'income': 0, 'expense': 0, 'count': 0, 'min_balance': None, 'min_row': None}
+            if a > 0:
+                daily[d]['income'] += a
+            else:
+                daily[d]['expense'] += abs(a)
+            daily[d]['count'] += 1
+            # 跟踪日内的最低余额
+            bal = int(r.get('balance') or 0)
+            if daily[d]['min_balance'] is None or bal < daily[d]['min_balance']:
+                daily[d]['min_balance'] = bal
+                daily[d]['min_row'] = r
+
+        any_negative = False
+        for d, v in daily.items():
+            net = v['income'] - v['expense']
+            running += net
+            min_b = v['min_balance']
+            note = ''
+            if min_b is not None and min_b < 0:
+                any_negative = True
+                note = f'⚠ 余额曾为负(¥{yuan(min_b)})'
+            print(f"  {d:<10} | ¥{yuan(v['income']):>11} | ¥{yuan(v['expense']):>11} | "
+                  f"¥{yuan(net):>11} | ¥{yuan(running):>11} | {v['count']:>5} | {note}")
+
+        print("-" * 100)
+        print(f"  起始余额      : ¥{yuan(start_balance)}    "
+              f"累计收入: ¥{yuan(income_total)}    累计支出: ¥{yuan(expense_total)}    "
+              f"期末余额: ¥{yuan(start_balance + income_total - expense_total)}")
+        if any_negative:
+            print(f"  ⚠ 注意：期间内余额曾出现负数，支出可能不是从正常收入中扣除！")
+        else:
+            print(f"  ✓ 余额始终为正，支出均从累计收入中正常扣除")
+        print()
+
         print(f"  收入合计   : ¥{yuan(income_total)}    支出合计: ¥{yuan(expense_total)}    "
               f"(仅业务收支，不含提现扣款/退回)")
         # 收入分类小计

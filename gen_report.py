@@ -107,12 +107,15 @@ def main():
     praise_rate = (float(star5) / float(rated) * 100) if rated else 0
 
     # 2c 课时费 & 总部收入 (完课)
+    # 总部收入 = 总部教练课时抽成,来自 de_top_point_logs.amount(type_id=4),按 hour_lesson_id 关联
     cur.execute(f"""
         SELECT COALESCE(SUM(l.teacher_point),0) AS teacher_fee,
-               COALESCE(SUM(l.agent_point),0) AS hq_income,
+               COALESCE(SUM(t.amount),0) AS hq_income,
                COALESCE(SUM(l.hour_count),0) AS hours,
-               COUNT(*) AS cnt
-        FROM de_student_hour_lessons l WHERE {comp}
+               COUNT(DISTINCT l.id) AS cnt
+        FROM de_student_hour_lessons l
+        LEFT JOIN de_top_point_logs t ON t.hour_lesson_id = l.id AND t.type_id = 4
+        WHERE {comp}
     """)
     fr = cur.fetchone()
     teacher_fee, hq_income, fee_hours, fee_cnt = fr

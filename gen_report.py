@@ -94,17 +94,19 @@ def main():
     level_total_hours = sum(float(r[2]) for r in level_rows) or 1
 
     # 2b 好评率 (完课中)
+    # star: 0=待评价, 1=不满意, 3=满意, 5=非常满意; 好评率 = (满意+非常满意) / 已评价
     cur.execute(f"""
         SELECT COUNT(*) AS total,
                SUM(CASE WHEN l.star>0 THEN 1 ELSE 0 END) AS rated,
                SUM(CASE WHEN l.star=5 THEN 1 ELSE 0 END) AS star5,
                SUM(CASE WHEN l.star=3 THEN 1 ELSE 0 END) AS star3,
-               SUM(CASE WHEN l.star=1 THEN 1 ELSE 0 END) AS star1
+               SUM(CASE WHEN l.star=1 THEN 1 ELSE 0 END) AS star1,
+               SUM(CASE WHEN l.star=0 THEN 1 ELSE 0 END) AS star0
         FROM de_student_hour_lessons l WHERE {comp}
     """)
     rr = cur.fetchone()
-    rate_total, rated, star5, star3, star1 = rr
-    praise_rate = (float(star5) / float(rated) * 100) if rated else 0
+    rate_total, rated, star5, star3, star1, star0 = rr
+    praise_rate = (float(star3 + star5) / float(rated) * 100) if rated else 0
 
     # 2c 课时费 & 总部收入 (完课)
     # 总部收入 = 总部教练课时抽成,来自 de_top_point_logs.amount(type_id=4),按 hour_lesson_id 关联
@@ -129,6 +131,7 @@ def main():
                COALESCE(SUM(l.hour_count),0) AS hours,
                COALESCE(SUM(l.teacher_point),0) AS tfee,
                SUM(CASE WHEN l.star=5 THEN 1 ELSE 0 END) AS s5,
+               SUM(CASE WHEN l.star=3 THEN 1 ELSE 0 END) AS s3,
                SUM(CASE WHEN l.star>0 THEN 1 ELSE 0 END) AS sr
         FROM de_student_hour_lessons l
         LEFT JOIN de_schools s ON s.id = l.teach_school_id AND s.deleted_at IS NULL
@@ -177,9 +180,9 @@ def main():
     # 交付中心排行 行
     ctr_trs = ''
     max_ctr_hours = max((float(r[2]) for r in center_rows), default=1)
-    for name, lessons, hours, tfee, s5, sr in center_rows:
+    for name, lessons, hours, tfee, s5, s3, sr in center_rows:
         hpct = float(hours) / center_total_hours * 100
-        pr = (float(s5) / float(sr) * 100) if sr else 0
+        pr = (float(s5 + s3) / float(sr) * 100) if sr else 0
         bar_w = float(hours) / max_ctr_hours * 100
         ctr_trs += f"""
         <tr>
@@ -195,10 +198,11 @@ def main():
     praise_cards = f"""
         <div class="mini-card"><div class="mini-label">完课总数</div><div class="mini-val">{fnum(rate_total)}</div></div>
         <div class="mini-card"><div class="mini-label">已评价数</div><div class="mini-val">{fnum(rated)}</div></div>
-        <div class="mini-card hl"><div class="mini-label">好评数(star=5)</div><div class="mini-val">{fnum(star5)}</div></div>
-        <div class="mini-card"><div class="mini-label">中评数(star=3)</div><div class="mini-val">{fnum(star3)}</div></div>
-        <div class="mini-card"><div class="mini-label">差评数(star=1)</div><div class="mini-val">{fnum(star1)}</div></div>
-        <div class="mini-card hl2"><div class="mini-label">好评率</div><div class="mini-val">{praise_rate:.1f}%</div></div>"""
+        <div class="mini-card"><div class="mini-label">待评价(star=0)</div><div class="mini-val">{fnum(star0)}</div></div>
+        <div class="mini-card hl"><div class="mini-label">非常满意(star=5)</div><div class="mini-val">{fnum(star5)}</div></div>
+        <div class="mini-card"><div class="mini-label">满意(star=3)</div><div class="mini-val">{fnum(star3)}</div></div>
+        <div class="mini-card"><div class="mini-label">不满意(star=1)</div><div class="mini-val">{fnum(star1)}</div></div>
+        <div class="mini-card hl2"><div class="mini-label">好评率(满意及以上)</div><div class="mini-val">{praise_rate:.1f}%</div></div>"""
 
     fee_cards = f"""
         <div class="mini-card hl"><div class="mini-label">课时费总额(教师)</div><div class="mini-val">{fmoney(teacher_fee)}<span class="unit">元</span></div></div>
@@ -312,9 +316,9 @@ def main():
       <tbody>"""
     # 注入排名
     ctr_body = ''
-    for i, (name, lessons, hours, tfee, s5, sr) in enumerate(center_rows, 1):
+    for i, (name, lessons, hours, tfee, s5, s3, sr) in enumerate(center_rows, 1):
         hpct = float(hours) / center_total_hours * 100
-        pr = (float(s5) / float(sr) * 100) if sr else 0
+        pr = (float(s5 + s3) / float(sr) * 100) if sr else 0
         bar_w = float(hours) / max_ctr_hours * 100
         rk = f'<span class="rank r{i}">{i}</span>' if i <= 3 else f'<span class="rank">{i}</span>'
         ctr_body += f"""

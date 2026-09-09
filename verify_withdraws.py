@@ -240,6 +240,9 @@ def verify_one(cur, withdraw_id, verbose=True):
     # 提现扣款(type=5/11)和提现退回(type=12)是边界事件，不计入收入/支出
     income_total = 0   # 收入合计(正)
     expense_total = 0  # 支出合计(正，取绝对值)
+    # 按 type_id 分类累计（正数为收入项，负数为支出项）
+    income_by_type = {}   # {type_id: [total_positive, count]}
+    expense_by_type = {}  # {type_id: [total_abs, count]}
     for r in detail_rows:
         a = int(r['amount'] or 0)
         t = int(r['type_id'])
@@ -247,8 +250,14 @@ def verify_one(cur, withdraw_id, verbose=True):
             continue  # 跳过提现扣款/退回日志（边界事件，非业务收支）
         if a > 0:
             income_total += a
+            income_by_type.setdefault(t, [0, 0])
+            income_by_type[t][0] += a
+            income_by_type[t][1] += 1
         else:
             expense_total += abs(a)
+            expense_by_type.setdefault(t, [0, 0])
+            expense_by_type[t][0] += abs(a)
+            expense_by_type[t][1] += 1
 
     # 净流水 = 收入 - 支出（仅业务收支，不含提现/退回）
     net_flow = income_total - expense_total
@@ -306,6 +315,20 @@ def verify_one(cur, withdraw_id, verbose=True):
         print("-" * 110)
         print(f"  收入合计   : ¥{yuan(income_total)}    支出合计: ¥{yuan(expense_total)}    "
               f"(仅业务收支，不含提现扣款/退回)")
+        # 收入分类小计
+        if income_by_type:
+            print(f"  收入分类小计（{len(income_by_type)} 类）：")
+            for t, (total, cnt) in sorted(income_by_type.items()):
+                tn = lookup.get(t, f"type{t}")
+                pct = (total / income_total * 100) if income_total else 0
+                print(f"    - {tn:<22} : ¥{yuan(total):>11}  ({cnt} 笔, 占 {pct:.1f}%)")
+        # 支出分类小计
+        if expense_by_type:
+            print(f"  支出分类小计（{len(expense_by_type)} 类）：")
+            for t, (total, cnt) in sorted(expense_by_type.items()):
+                tn = lookup.get(t, f"type{t}")
+                pct = (total / expense_total * 100) if expense_total else 0
+                print(f"    - {tn:<22} : ¥{yuan(total):>11}  ({cnt} 笔, 占 {pct:.1f}%)")
         print()
 
         # 本次提现对应的扣款日志

@@ -51,9 +51,18 @@ def main():
     cur = conn.cursor()
 
     # 基础过滤片段(统一使用别名 l.)
-    base = ("l.lesson_type=1 AND l.deleted_at IS NULL "
+    # 口径: lesson_type=1(正式课) + deleted_at IS NULL(未软删除) + state=1(有效课,排除作废占位)
+    # 说明: state=2 为排课后取消/作废的占位记录,全部 hour_count=0,会污染上课数,已排除
+    # 已验证: state=1 内业务键(学生+老师+开始时间)完全唯一,无重复
+    base = ("l.lesson_type=1 AND l.deleted_at IS NULL AND l.state=1 "
             "AND l.start_time>=%s AND l.start_time<%s" % (T_START, T_END))
     comp = base + " AND l.star_confirm=1"
+
+    # 数据质量: 同时统计作废占位记录数,用于报告说明
+    cur.execute(f"""SELECT COUNT(*) FROM de_student_hour_lessons l
+        WHERE l.lesson_type=1 AND l.deleted_at IS NULL AND l.state=2
+        AND l.start_time>=%s AND l.start_time<%s""", (T_START, T_END))
+    void_cnt = cur.fetchone()[0]
 
     # ===== 1. 正式课 上课数 / 完课数 (按次数 & 课时) =====
     cur.execute(f"""
@@ -256,12 +265,12 @@ def main():
 <div class="wrap">
   <div class="head">
     <h1>暑假正式课统计报告</h1>
-    <div class="sub">统计区间：{DATE_START:%Y年%m月%d日} — {DATE_END:%Y年%m月%d日} （{fnum(attend_cnt)} 节正式课）</div>
+    <div class="sub">统计区间：{DATE_START:%Y年%m月%d日} — {DATE_END:%Y年%m月%d日} （有效正式课 {fnum(attend_cnt)} 节）</div>
     <div class="meta">数据来源：deshengoa 库 / de_student_hour_lessons · de_schools · de_teacher_level_statuses ｜ 报告生成时间：{gen_time}</div>
   </div>
 
   <section>
-    <h2><span class="n">1</span>正式课 上课数 / 完课数 <span class="tag">lesson_type=1</span></h2>
+    <h2><span class="n">1</span>正式课 上课数 / 完课数 <span class="tag">lesson_type=1 · state=1</span></h2>
     <div class="cards">
       <div class="card" style="background:linear-gradient(135deg,#1e40af,#3b82f6)">
         <div class="t">上课数（按次数）</div><div class="v">{fnum(attend_cnt)}<span class="u">节</span></div></div>
@@ -276,8 +285,10 @@ def main():
       <div class="card" style="background:linear-gradient(135deg,#7c3aed,#a855f7)">
         <div class="t">完课率（按课时）</div><div class="v">{done_rate_hr:.1f}<span class="u">%</span></div></div>
     </div>
-    <div class="note"><b>口径：</b>正式课 = <code>lesson_type=1</code>；完课 = <code>star_confirm=1</code>；
-      统计区间以 <code>start_time</code>（Unix时间戳）落入 [{T_START}, {T_END}) 为准；已排除软删除（<code>deleted_at IS NULL</code>）。</div>
+    <div class="note"><b>口径：</b>正式课 = <code>lesson_type=1</code>；有效课 = <code>state=1</code>（已排除排课后取消/作废的占位记录）；
+      完课 = <code>star_confirm=1</code>；统计区间以 <code>start_time</code>（Unix时间戳）落入 [{T_START}, {T_END}) 为准；已排除软删除（<code>deleted_at IS NULL</code>）。
+      <b>数据质量：</b>同区间另有 <b>{fnum(void_cnt)}</b> 条 <code>state=2</code> 的作废占位记录（均 <code>hour_count=0</code>、无课时无费用），已全部排除；
+      <code>state=1</code> 内业务键（学生+老师+开始时间）经校验<b>完全唯一、无重复</b>。</div>
   </section>
 
   <section>

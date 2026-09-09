@@ -260,11 +260,11 @@ def main():
   <div class="head">
     <h1>暑假正式课统计报告</h1>
     <div class="sub">统计区间：{DATE_START:%Y年%m月%d日} — {DATE_END:%Y年%m月%d日} （有效正式课 {fnum(attend_cnt)} 节）</div>
-    <div class="meta">数据来源：deshengoa 库 / de_student_hour_lessons · de_schools · de_teacher_level_statuses ｜ 报告生成时间：{gen_time}</div>
+    <div class="meta">报告生成时间：{gen_time}</div>
   </div>
 
   <section>
-    <h2><span class="n">1</span>正式课 上课数 / 完课数 <span class="tag">lesson_type=1 · state=1</span></h2>
+    <h2><span class="n">1</span>正式课 上课数 / 完课数</h2>
     <div class="cards">
       <div class="card" style="background:linear-gradient(135deg,#1e40af,#3b82f6)">
         <div class="t">上课数（按次数）</div><div class="v">{fnum(attend_cnt)}<span class="u">节</span></div></div>
@@ -298,7 +298,7 @@ def main():
   </section>
 
   <section>
-    <h2><span class="n">3</span>交付中心课时排行 <span class="tag">teach_school_id → de_schools.name</span></h2>
+    <h2><span class="n">3</span>交付中心课时排行</h2>
     <table>
       <thead><tr><th>排名</th><th>交付中心</th><th>完课数</th><th>完课课时</th><th>课时占比</th><th>课时费(元)</th><th>好评率</th><th>课时分布</th></tr></thead>
       <tbody>"""

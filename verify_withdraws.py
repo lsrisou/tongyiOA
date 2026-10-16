@@ -235,9 +235,8 @@ def verify_one(cur, withdraw_id, verbose=True):
     cur.execute(sql, (log_id_col, type_withdraw, type_return, withdraw_id))
     withdraw_logs = cur.fetchall()
 
-    # 计算两次提现之间的流水净收入（仅非提现/退回类流水）
-    # 收入类(amount>0)累加，支出类(amount<0)累加
-    # 提现扣款(type=5/11)和提现退回(type=12)是边界事件，不计入收入/支出
+    # 计算两次提现之间的流水净收入
+    # 仅排除 type_withdraw（提现扣款 5/11），type_return（提现退回 12）是收入需计入
     income_total = 0   # 收入合计(正)
     expense_total = 0  # 支出合计(正，取绝对值)
     # 按 type_id 分类累计（正数为收入项，负数为支出项）
@@ -246,8 +245,9 @@ def verify_one(cur, withdraw_id, verbose=True):
     for r in detail_rows:
         a = int(r['amount'] or 0)
         t = int(r['type_id'])
-        if t == type_withdraw or t == type_return:
-            continue  # 跳过提现扣款/退回日志（边界事件，非业务收支）
+        if t == type_withdraw:
+            continue  # 仅跳过本次提现扣款日志（边界事件）
+        # type_return(12) 是提现退回，属于收入，正常计入
         if a > 0:
             income_total += a
             income_by_type.setdefault(t, [0, 0])
@@ -337,8 +337,8 @@ def verify_one(cur, withdraw_id, verbose=True):
         for r in detail_rows:
             a = int(r['amount'] or 0)
             t = int(r['type_id'])
-            if t == type_withdraw or t == type_return:
-                continue  # 跳过提现扣款/退回
+            if t == type_withdraw:
+                continue  # 仅跳过提现扣款，提现退回(12)是收入需计入
             d = str(r['created_at'])[:10]
             if d not in daily:
                 daily[d] = {'income': 0, 'expense': 0, 'count': 0, 'min_balance': None, 'min_row': None}
@@ -376,7 +376,7 @@ def verify_one(cur, withdraw_id, verbose=True):
         print()
 
         # 4. 收支分类
-        print(f"【4. 收支分类】（仅业务收支，不含提现扣款/退回）")
+        print(f"【4. 收支分类】（含提现退回收入，仅不含本次提现扣款）")
         print(f"  收入合计: ¥{yuan(income_total)}    支出合计: ¥{yuan(expense_total)}")
         # 收入分类小计
         if income_by_type:

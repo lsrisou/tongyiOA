@@ -1,14 +1,22 @@
-"""用法: python3 query_lesson_logs.py <lesson_id>
+"""操作日志查询工具 (deshengoa.de_admin_action_logs)
 
-按课程 id(de_student_hour_lessons.id) 查询 de_admin_action_logs 中的操作日志:
-- 匹配 content JSON 里 request.id(以及 old/其他位置的 id) == 课程id
-- 按 created_at 正序输出: 时间 / 操作人(de_admin_users) / action / content / old / request / IP
+用法:
+  python3 query_lesson_logs.py <creator_id> [start end] [--action 关键词]
+      按管理员 id(=de_admin_users.id, 即日志 creator 字段) 查操作日志, created_at 正序
+      start/end 可选, 格式 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS (end 为日期时含当天)
+  python3 query_lesson_logs.py --lesson <lesson_id>
+      按课程 id(de_student_hour_lessons.id) 查相关日志
+
+示例:
+  python3 query_lesson_logs.py 17399 2026-10-18 2026-10-18
+  python3 query_lesson_logs.py 17399 --action 课程评价
 """
 import json
 import select
 import socket
 import sys
 import threading
+from datetime import datetime, timedelta
 
 import paramiko
 import pymysql
@@ -97,8 +105,41 @@ def open_bridge(client, remote_host, remote_port):
     return local_port
 
 
+def connect():
+    client = ssh_client()
+    port = open_bridge(client, DB_HOST, DB_PORT)
+    conn = pymysql.connect(host='127.0.0.1', port=port, user=DB_USER, password=DB_PASS,
+                           db=DB_NAME, charset='utf8mb4', connect_timeout=20,
+                           cursorclass=pymysql.cursors.DictCursor)
+    return client, conn
+
+
+def fmt(v):
+    """尽量把 JSON 字符串压成一行中文友好的格式。"""
+    if v is None:
+        return '(空)'
+    if isinstance(v, str) and v.strip():
+        try:
+            v = json.loads(v)
+        except Exception:
+            return v
+    return json.dumps(v, ensure_ascii=False, separators=(',', ':'))
+
+
+def parse_date(s, end=False):
+    fmts = ['%Y-%m-%d', '%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S']
+    for f in fmts:
+        try:
+            d = datetime.strptime(s, f)
+            if end and f == '%Y-%m-%d':
+                d = d + timedelta(days=1) - timedelta(seconds=1)
+            return d.strftime('%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            continue
+    raise SystemExit(f'日期格式不对: {s} (用 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS)')
+
+
 def find_matches(node, lesson_id, path='$'):
-    """递归查找 content JSON 中 key 为 id 类字段且值等于课程id的位置。"""
     hits = []
     if isinstance(node, dict):
         for k, v in node.items():
@@ -114,88 +155,124 @@ def find_matches(node, lesson_id, path='$'):
     return hits
 
 
-def fmt(v):
-    if v is None:
-        return '(空)'
-    if isinstance(v, str) and v.strip():
+def query_creator(cur, creator_id, start, end, action_kw):
+    """按 creator id 查日志, 返回 (用户信息, 日志列表, 各action统计)"""
+    cur.execute('SELECT id, name, username, disabled FROM de_admin_users WHERE id=%s', (creator_id,))
+    user = cur.fetchone()
+    cond, args = ['creator=%s'], [creator_id]
+    if start:
+        cond.append('created_at>=%s')
+        args.append(start)
+    if end:
+        cond.append('created_at<=%s')
+        args.append(end)
+    if action_kw:
+        cond.append('action LIKE %s')
+        args.append(f'%{action_kw}%')
+    where = ' AND '.join(cond)
+    cur.execute(f'SELECT COUNT(*) AS c, MIN(created_at) AS mn, MAX(created_at) AS mx '
+                f'FROM de_admin_action_logs WHERE {where}', args)
+    stat = cur.fetchone()
+    cur.execute(f'SELECT id, user_id, action, msg, content, ip, created_at '
+                f'FROM de_admin_action_logs WHERE {where} ORDER BY created_at ASC, id ASC', args)
+    rows = cur.fetchall()
+    cur.execute(f'SELECT action, COUNT(*) AS c FROM de_admin_action_logs WHERE {where} '
+                f'GROUP BY action ORDER BY c DESC', args)
+    return user, rows, stat, cur.fetchall()
+
+
+def query_lesson(cur, lesson_id):
+    cur.execute('SELECT id, student_id, teacher_id, start_time, hour_count, state '
+                'FROM de_student_hour_lessons WHERE id=%s', (lesson_id,))
+    lesson = cur.fetchone()
+    cur.execute('SELECT id, creator, user_id, action, msg, content, ip, created_at '
+                'FROM de_admin_action_logs WHERE content LIKE %s ORDER BY created_at ASC, id ASC',
+                (f'%{lesson_id}%',))
+    logs = []
+    for r in cur.fetchall():
         try:
-            return json.dumps(json.loads(v), ensure_ascii=False, separators=(',', ':'))
+            c = json.loads(r['content']) if r['content'] else {}
         except Exception:
-            return v
-    return json.dumps(v, ensure_ascii=False, separators=(',', ':'))
+            c = {}
+        paths = find_matches(c, lesson_id)
+        if paths:
+            r['_paths'] = paths
+            r['_c'] = c
+            logs.append(r)
+    return lesson, logs
+
+
+def show_creator(cur, creator_id, start, end, action_kw):
+    user, rows, stat, by_action = query_creator(cur, creator_id, start, end, action_kw)
+    rng = f'{start or ""} ~ {end or ""}'.strip(' ~')
+    if user:
+        print(f'===== 操作人: id={user["id"]} {user["name"]} ({user["username"]}) '
+              f'disabled={user["disabled"]} =====')
+    else:
+        print(f'===== creator id={creator_id} (de_admin_users 中未找到) =====')
+    print(f'日志 {stat["c"]} 条, 时间 {stat["mn"]} ~ {stat["mx"]} {rng and f"[过滤:{rng}]"}'
+          + (f' [action过滤:{action_kw}]' if action_kw else ''))
+    print('操作类型分布: ' + ', '.join(f'{r["action"]}×{r["c"]}' for r in by_action))
+    print()
+    for i, r in enumerate(rows, 1):
+        print(f'--- #{i} 日志id={r["id"]}  时间={r["created_at"]}  '
+              f'action={r["action"]}  IP={r["ip"]}')
+        if r['msg']:
+            print(f'    msg: {r["msg"]}')
+        print(f'    content: {fmt(r["content"])}')
+    if not rows:
+        print('(无日志)')
+
+
+def show_lesson(cur, lesson_id):
+    lesson, logs = query_lesson(cur, lesson_id)
+    print(f'===== 课程 de_student_hour_lessons id={lesson_id} =====')
+    print(json.dumps(lesson, ensure_ascii=False, default=str) if lesson else '(课程不存在)')
+    print(f'\n===== 操作日志 {len(logs)} 条 (created_at 正序) =====')
+    names = {}
+    uids = {r['creator'] for r in logs if r['creator']}
+    if uids:
+        ph = ','.join(['%s'] * len(uids))
+        cur.execute(f'SELECT id, name, username FROM de_admin_users WHERE id IN ({ph})', list(uids))
+        names = {u['id']: u for u in cur.fetchall()}
+    for i, r in enumerate(logs, 1):
+        u = names.get(r['creator'])
+        cu = f"{r['creator']}({u['name']}/{u['username']})" if u else f"{r['creator']}(未找到用户)"
+        print(f'\n--- #{i} 日志id={r["id"]}  时间={r["created_at"]}')
+        print(f'    操作人 creator={cu}  action={r["action"]}  IP={r["ip"]}')
+        print(f'    匹配位置: {", ".join(r["_paths"])}')
+        c = r['_c']
+        if 'old' in c:
+            print(f'    old(改之前): {fmt(c["old"])}')
+        if 'request' in c:
+            print(f'    request: {fmt(c["request"])}')
+        rest = {k: v for k, v in c.items() if k not in ('old', 'request')}
+        if rest:
+            print(f'    content其他字段: {fmt(rest)}')
+    if not logs:
+        print('(未找到相关日志)')
 
 
 def main():
-    if len(sys.argv) < 2:
-        print('用法: python3 query_lesson_logs.py <lesson_id>')
+    argv = sys.argv[1:]
+    if not argv:
+        print(__doc__)
         sys.exit(1)
-    lesson_id = int(sys.argv[1])
-
-    client = ssh_client()
-    port = open_bridge(client, DB_HOST, DB_PORT)
-    conn = pymysql.connect(host='127.0.0.1', port=port, user=DB_USER, password=DB_PASS,
-                           db=DB_NAME, charset='utf8mb4', connect_timeout=20,
-                           cursorclass=pymysql.cursors.DictCursor)
+    action_kw = None
+    if '--action' in argv:
+        i = argv.index('--action')
+        action_kw = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
+    client, conn = connect()
     try:
         with conn.cursor() as cur:
-            cur.execute('SELECT id, student_id, teacher_id, start_time, hour_count, state '
-                        'FROM de_student_hour_lessons WHERE id=%s', (lesson_id,))
-            lesson = cur.fetchone()
-            print(f'===== 课程 de_student_hour_lessons id={lesson_id} =====')
-            print(json.dumps(lesson, ensure_ascii=False, default=str) if lesson else '(课程不存在)')
-
-            # LIKE 预过滤后由 Python 精确匹配 JSON 路径
-            cur.execute(
-                'SELECT id, region, school_id, user_id, creator, action, msg, content, ip, created_at '
-                'FROM de_admin_action_logs '
-                'WHERE content LIKE %s ORDER BY created_at ASC, id ASC',
-                (f'%{lesson_id}%',))
-            rows = cur.fetchall()
-
-            logs = []
-            for r in rows:
-                try:
-                    c = json.loads(r['content']) if r['content'] else {}
-                except Exception:
-                    c = {}
-                paths = find_matches(c, lesson_id)
-                if paths:
-                    r['_content_json'] = c
-                    r['_paths'] = paths
-                    logs.append(r)
-
-            print(f'\n===== 操作日志 {len(logs)} 条 (created_at 正序) =====')
-            if not logs:
-                print('(未找到相关日志)')
-
-            user_ids = set()
-            for r in logs:
-                for k in ('creator', 'user_id'):
-                    if r.get(k):
-                        user_ids.add(r[k])
-            names = {}
-            if user_ids:
-                ph = ','.join(['%s'] * len(user_ids))
-                cur.execute(f'SELECT id, name, username FROM de_admin_users WHERE id IN ({ph})',
-                            list(user_ids))
-                names = {u['id']: u for u in cur.fetchall()}
-
-            for i, r in enumerate(logs, 1):
-                c = r['_content_json']
-                cu = names.get(r['creator'])
-                cu_s = f"{r['creator']}({cu['name']}/{cu['username']})" if cu else f"{r['creator']}(未找到用户)"
-                print(f'\n--- #{i} 日志id={r["id"]}  时间={r["created_at"]}')
-                print(f'    操作人 creator={cu_s}  user_id={r["user_id"]}  action={r["action"]}  IP={r["ip"]}')
-                if r['msg']:
-                    print(f'    msg: {r["msg"]}')
-                print(f'    匹配位置: {", ".join(r["_paths"])}')
-                if 'old' in c:
-                    print(f'    old(改之前): {fmt(c["old"])}')
-                if 'request' in c:
-                    print(f'    request: {fmt(c["request"])}')
-                rest = {k: v for k, v in c.items() if k not in ('old', 'request')}
-                if rest:
-                    print(f'    content其他字段: {fmt(rest)}')
+            if argv[0] == '--lesson':
+                show_lesson(cur, int(argv[1]))
+            else:
+                creator_id = int(argv[0])
+                start = parse_date(argv[1]) if len(argv) > 1 else None
+                end = parse_date(argv[2], end=True) if len(argv) > 2 else None
+                show_creator(cur, creator_id, start, end, action_kw)
     finally:
         conn.close()
         client.close()

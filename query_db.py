@@ -1,15 +1,10 @@
 """
-各学段 2026年10月 视频点击率统计
+各学段 2026年7月、8月、10月 视频点击率对比
 
-数据口径:
-- 点击来源: tongyiedu_analysis.log_user_course_{plate} (course_id > 0, log_date 2026-10)
-- 课程主数据: tyeducation.tifen_course
-    is_folder = 0  (有效课程, 非文件夹)
-    type_id = 1    (章节视频)
-    type_id = 2    (知识点视频)
-- 学段对应: plate_id 1=小学, 20=初中, 33=高中
-
-点击率 = 被点击的课程数 / 有效课程总数
+口径:
+- 点击来源: tongyiedu_analysis.log_user_course_{1|20|33} (course_id > 0)
+- 课程主数据: tyeducation.tifen_course (is_folder=0, type_id: 1章节, 2知识点)
+- 点击率 = 被点击课程数 / 有效课程总数
 """
 import socket, threading, time, pymysql, paramiko
 
@@ -53,148 +48,134 @@ time.sleep(1)
 conn=pymysql.connect(host='127.0.0.1',port=LOCAL_PORT,user=DB_USER,password=DB_PASS,charset='utf8mb4',connect_timeout=30)
 cursor=conn.cursor()
 
-# 配置
-STAGES = [
-    ('小学',  1,  'log_user_course_1'),
-    ('初中',  20, 'log_user_course_20'),
-    ('高中',  33, 'log_user_course_33'),
+STAGES    = [('小学',1,'log_user_course_1'),('初中',20,'log_user_course_20'),('高中',33,'log_user_course_33')]
+MONTHS    = [
+    ('2026年7月', '2026-07-01', '2026-08-01'),
+    ('2026年8月', '2026-08-01', '2026-09-01'),
+    ('2026年10月','2026-10-01', '2026-11-01'),
 ]
+TYPE_LABEL = {1:'章节视频', 2:'知识点视频'}
 
-TYPE_LABEL = {1: '章节视频', 2: '知识点视频'}
-DATE_START = '2026-10-01'
-DATE_END   = '2026-11-01'
-
-print("="*80)
-print("各学段 2026年10月 视频点击率统计")
-print("口径: 点击率 = 被点击的课程数 / 有效课程总数 (is_folder=0, type_id IN 1,2)")
-print("="*80)
-
-# ============ 先拿到各 type_id 的有效课程总数 ============
+# 拿课程总基数
 cursor.execute("USE tyeducation")
-print("\n【有效课程总基数】tyeducation.tifen_course (is_folder=0)")
-total_base = {}
-for tid in [1, 2]:
+BASE = {}
+for tid in [1,2]:
     cursor.execute("SELECT COUNT(*) FROM tifen_course WHERE is_folder=0 AND type_id=%s", (tid,))
-    cnt = cursor.fetchone()[0]
-    total_base[tid] = cnt
-    print(f"  type_id={tid} {TYPE_LABEL[tid]}: {cnt:,}")
+    BASE[tid] = cursor.fetchone()[0]
 
-# 全部有效课程（不区分学段，主库是全量的）
-cursor.execute("SELECT COUNT(*) FROM tifen_course WHERE is_folder=0 AND type_id IN (1,2)")
-all_total = cursor.fetchone()[0]
-print(f"  合计: {all_total:,}")
+print("="*100)
+print("各学段 2026年7月 / 8月 / 10月 视频点击率对比")
+print(f"课程基数: type_id=1 章节视频 {BASE[1]:,} 条 | type_id=2 知识点视频 {BASE[2]:,} 条")
+print("="*100)
 
-# ============ 分学段统计 ============
-print(f"\n{'='*80}")
-print("【各学段 2026-10 点击率明细】")
-print(f"{'='*80}")
+# 月度 × 学段 × 类型 统计
+results = {}
 
-summary = []
+for month_label, dstart, dend in MONTHS:
+    print(f"\n{'═'*100}")
+    print(f"▶ {month_label}  (log_date: {dstart} ~ {dend})")
+    print(f"{'═'*100}")
 
-for stage_name, plate_id, log_table in STAGES:
-    print(f"\n{'─'*80}")
-    print(f"▶ {stage_name} (plate_id={plate_id}, 日志表={log_table})")
-    print(f"{'─'*80}")
+    for stage_name, plate_id, log_table in STAGES:
+        cursor.execute("USE tongyiedu_analysis")
 
-    cursor.execute("USE tongyiedu_analysis")
-
-    # 该学段 10月 总日志数 & 有效 course_id 日志数
-    cursor.execute(f"""
-        SELECT COUNT(*), SUM(CASE WHEN course_id > 0 THEN 1 ELSE 0 END),
-               COUNT(DISTINCT user_id), COUNT(DISTINCT CASE WHEN course_id > 0 THEN user_id END)
-        FROM `{log_table}`
-        WHERE log_date >= '{DATE_START}' AND log_date < '{DATE_END}'
-    """)
-    total_logs, valid_logs, total_users, active_users = cursor.fetchone()
-    print(f"  10月日志总条数: {total_logs:,}  有效(course_id>0): {valid_logs:,}")
-    print(f"  总活跃用户数: {total_users:,}  有课程行为用户: {active_users:,}")
-
-    cursor.execute("USE tyeducation")
-
-    stage_row = {'stage': stage_name}
-
-    for tid, tlabel in TYPE_LABEL.items():
-        # 该类型有效课程总数
-        cursor.execute("SELECT COUNT(*) FROM tifen_course WHERE is_folder=0 AND type_id=%s", (tid,))
-        total_courses = cursor.fetchone()[0]
-
-        # 被点击的 distinct course_id 数（10月内）
+        # 学段该月活跃用户数
         cursor.execute(f"""
-            SELECT COUNT(DISTINCT l.course_id)
-            FROM tongyiedu_analysis.`{log_table}` l
-            JOIN tyeducation.tifen_course c ON l.course_id = c.id
-            WHERE l.log_date >= '{DATE_START}' AND l.log_date < '{DATE_END}'
-              AND l.course_id > 0
-              AND c.is_folder = 0
-              AND c.type_id = %s
-        """, (tid,))
-        clicked_courses = cursor.fetchone()[0]
+            SELECT COUNT(DISTINCT user_id)
+            FROM `{log_table}`
+            WHERE log_date >= '{dstart}' AND log_date < '{dend}'
+        """)
+        stage_users = cursor.fetchone()[0]
 
-        # 总点击次数
-        cursor.execute(f"""
-            SELECT COUNT(*)
-            FROM tongyiedu_analysis.`{log_table}` l
-            JOIN tyeducation.tifen_course c ON l.course_id = c.id
-            WHERE l.log_date >= '{DATE_START}' AND l.log_date < '{DATE_END}'
-              AND l.course_id > 0
-              AND c.is_folder = 0
-              AND c.type_id = %s
-        """, (tid,))
-        total_clicks = cursor.fetchone()[0]
+        print(f"\n  [{stage_name}] 活跃用户 {stage_users:,}")
 
-        # 点击用户数
-        cursor.execute(f"""
-            SELECT COUNT(DISTINCT l.user_id)
-            FROM tongyiedu_analysis.`{log_table}` l
-            JOIN tyeducation.tifen_course c ON l.course_id = c.id
-            WHERE l.log_date >= '{DATE_START}' AND l.log_date < '{DATE_END}'
-              AND l.course_id > 0
-              AND c.is_folder = 0
-              AND c.type_id = %s
-        """, (tid,))
-        clicking_users = cursor.fetchone()[0]
+        results[(month_label, stage_name)] = {}
 
-        rate = (clicked_courses / total_courses * 100) if total_courses > 0 else 0
-        user_rate = (clicking_users / total_users * 100) if total_users > 0 else 0
+        for tid, tlabel in TYPE_LABEL.items():
+            cursor.execute("USE tyeducation")
 
-        stage_row[tlabel] = {
-            'total_courses': total_courses,
-            'clicked_courses': clicked_courses,
-            'total_clicks': total_clicks,
-            'clicking_users': clicking_users,
-            'total_users': total_users,
-            'rate': rate,
-            'user_rate': user_rate,
-        }
+            cursor.execute(f"""
+                SELECT COUNT(DISTINCT l.course_id), COUNT(*), COUNT(DISTINCT l.user_id)
+                FROM tongyiedu_analysis.`{log_table}` l
+                JOIN tyeducation.tifen_course c ON l.course_id = c.id
+                WHERE l.log_date >= '{dstart}' AND l.log_date < '{dend}'
+                  AND l.course_id > 0
+                  AND c.is_folder = 0
+                  AND c.type_id = %s
+            """, (tid,))
+            clicked, clicks, click_users = cursor.fetchone()
+            rate = clicked / BASE[tid] * 100 if BASE[tid] else 0
+            user_rate = click_users / stage_users * 100 if stage_users else 0
 
-        print(f"\n  【{tlabel}】")
-        print(f"    有效课程总数: {total_courses:,}")
-        print(f"    被点击课程数: {clicked_courses:,}  ({rate:.2f}%)")
-        print(f"    总点击次数:   {total_clicks:,}")
-        print(f"    点击用户数:   {clicking_users:,} / {total_users:,} ({user_rate:.2f}%)")
+            results[(month_label, stage_name)][tid] = {
+                'clicked': clicked, 'clicks': clicks, 'click_users': click_users,
+                'rate': rate, 'user_rate': user_rate, 'stage_users': stage_users,
+            }
+            print(f"    {tlabel}: 被点击 {clicked:,}/{BASE[tid]:,} ({rate:.2f}%) | 总点击 {clicks:,} | 用户 {click_users:,}/{stage_users:,} ({user_rate:.2f}%)")
 
-    summary.append(stage_row)
+# ============ 趋势对比表 ============
+print(f"\n{'='*100}")
+print("【汇总趋势对比表】")
+print(f"{'='*100}")
 
-# ============ 汇总对比表 ============
-print(f"\n{'='*80}")
-print("【汇总对比】各学段 2026年10月 点击率")
-print(f"{'='*80}")
-
-header = f"{'学段':>6}  | {'类型':>8}  | {'课程总数':>10}  | {'被点击数':>10}  | {'点击率':>8}  | {'点击次数':>10}  | {'点击用户':>8}  | {'用户占比':>8}"
+# 表1: 点击率 %
+print(f"\n▶ 各学段各类型 点击率 (%) —— 月度对比")
+header = f"{'学段':>6}  |  {'类型':>8}  |" + "".join(f" {m.split('年')[1].split('月')[0]:>6}月  |" for m,_,_ in MONTHS)
 print(header)
-print('─' * len(header))
-
-for row in summary:
+print('─'*len(header))
+for stage_name, _, _ in STAGES:
     for tid in [1, 2]:
-        d = row[TYPE_LABEL[tid]]
-        print(
-            f"{row['stage']:>6}  | {TYPE_LABEL[tid]:>8}  | "
-            f"{d['total_courses']:>10,}  | {d['clicked_courses']:>10,}  | "
-            f"{d['rate']:>7.2f}%  | {d['total_clicks']:>10,}  | "
-            f"{d['clicking_users']:>8,}  | {d['user_rate']:>7.2f}%"
-        )
+        vals = []
+        for m,_,_ in MONTHS:
+            r = results[(m, stage_name)][tid]['rate']
+            vals.append(f"{r:.2f}%")
+        print(f"{stage_name:>6}  |  {TYPE_LABEL[tid]:>8}  |" + "".join(f" {v:>7}  |" for v in vals))
+
+# 表2: 被点击课程数
+print(f"\n▶ 各学段各类型 被点击课程数 —— 月度对比")
+header = f"{'学段':>6}  |  {'类型':>8}  |" + "".join(f" {m:>10}  |" for m,_,_ in MONTHS)
+print(header)
+print('─'*len(header))
+for stage_name, _, _ in STAGES:
+    for tid in [1, 2]:
+        vals = []
+        for m,_,_ in MONTHS:
+            vals.append(f"{results[(m, stage_name)][tid]['clicked']:,}")
+        print(f"{stage_name:>6}  |  {TYPE_LABEL[tid]:>8}  |" + "".join(f" {v:>10}  |" for v in vals))
+
+# 表3: 总点击次数
+print(f"\n▶ 各学段各类型 总点击次数 —— 月度对比")
+header = f"{'学段':>6}  |  {'类型':>8}  |" + "".join(f" {m:>12}  |" for m,_,_ in MONTHS)
+print(header)
+print('─'*len(header))
+for stage_name, _, _ in STAGES:
+    for tid in [1, 2]:
+        vals = []
+        for m,_,_ in MONTHS:
+            vals.append(f"{results[(m, stage_name)][tid]['clicks']:,}")
+        print(f"{stage_name:>6}  |  {TYPE_LABEL[tid]:>8}  |" + "".join(f" {v:>12}  |" for v in vals))
+
+# 表4: 用户占比（有行为的活跃用户 %）
+print(f"\n▶ 各学段各类型 点击用户占比 (%) —— 月度对比")
+header = f"{'学段':>6}  |  {'类型':>8}  |" + "".join(f" {m.split('年')[1].split('月')[0]:>6}月  |" for m,_,_ in MONTHS)
+print(header)
+print('─'*len(header))
+for stage_name, _, _ in STAGES:
+    for tid in [1, 2]:
+        vals = []
+        for m,_,_ in MONTHS:
+            vals.append(f"{results[(m, stage_name)][tid]['user_rate']:.2f}%")
+        print(f"{stage_name:>6}  |  {TYPE_LABEL[tid]:>8}  |" + "".join(f" {v:>7}  |" for v in vals))
+
+# 活跃用户数参考
+print(f"\n▶ 各学段 活跃用户数（参考基数）")
+for stage_name, _, _ in STAGES:
+    vals = []
+    for m,_,_ in MONTHS:
+        vals.append(f"{results[(m, stage_name)][1]['stage_users']:,}")
+    print(f"  {stage_name}:  " + "".join(f" {m}: {v}  " for (m,_,_), v in zip(MONTHS, vals)))
 
 cursor.close()
 conn.close()
 transport.close()
-print("\n统计完成!")
+print("\n完成!")

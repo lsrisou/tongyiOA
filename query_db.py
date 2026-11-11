@@ -1,10 +1,22 @@
-"""完整统计 - 修复版"""
+"""
+各学段 2026年10月 视频点击率统计
+
+数据口径:
+- 点击来源: tongyiedu_analysis.log_user_course_{plate} (course_id > 0, log_date 2026-10)
+- 课程主数据: tyeducation.tifen_course
+    is_folder = 0  (有效课程, 非文件夹)
+    type_id = 1    (章节视频)
+    type_id = 2    (知识点视频)
+- 学段对应: plate_id 1=小学, 20=初中, 33=高中
+
+点击率 = 被点击的课程数 / 有效课程总数
+"""
 import socket, threading, time, pymysql, paramiko
 
 PROXY_HOST='127.0.0.1'; PROXY_PORT=18080
 SSH_HOST='8.141.117.235'; SSH_PORT=22; SSH_USER='dev_risou'; SSH_PASS='TLiRisou2008'
 DB_HOST='rm-2zetutg9456f757u9.mysql.rds.aliyuncs.com'; DB_PORT=3306
-DB_USER='tyedu'; DB_PASS='YpDcaxw4fQWTR0DLz7ocKhZPMy0Z1'; DB_NAME='tongyiedu_analysis'
+DB_USER='tyedu'; DB_PASS='YpDcaxw4fQWTR0DLz7ocKhZPMy0Z1'
 LOCAL_PORT=23306
 
 def create_proxy_socket(h,p):
@@ -38,167 +50,151 @@ def handle(c):
 threading.Thread(target=lambda:[threading.Thread(target=handle,args=(c,),daemon=True).start() for c,_ in iter(server.accept,None)],daemon=True).start()
 time.sleep(1)
 
-conn=pymysql.connect(host='127.0.0.1',port=LOCAL_PORT,user=DB_USER,password=DB_PASS,database=DB_NAME,charset='utf8mb4',connect_timeout=30)
+conn=pymysql.connect(host='127.0.0.1',port=LOCAL_PORT,user=DB_USER,password=DB_PASS,charset='utf8mb4',connect_timeout=30)
 cursor=conn.cursor()
 
-# ============ 1. 请求日志中视频/知识点相关 URL 统计 ============
-print("="*70)
-print("【1】请求日志 - 视频/知识点相关 API 调用统计 (最近月表 tifen_request_log_202611)")
-print("="*70)
+# 配置
+STAGES = [
+    ('小学',  1,  'log_user_course_1'),
+    ('初中',  20, 'log_user_course_20'),
+    ('高中',  33, 'log_user_course_33'),
+]
 
-LATEST_LOG = 'tifen_request_log_202611'
-print(f"\n  按 request_url 分组 - 视频相关 TOP:")
-cursor.execute(f"""
-    SELECT request_url, COUNT(*) as cnt 
-    FROM `{LATEST_LOG}` 
-    WHERE request_url LIKE '%video%' OR request_url LIKE '%Video%'
-    GROUP BY request_url 
-    ORDER BY cnt DESC 
-    LIMIT 20
-""")
-for row in cursor.fetchall():
-    print(f"    {row[1]:>8,}  {row[0]}")
+TYPE_LABEL = {1: '章节视频', 2: '知识点视频'}
+DATE_START = '2026-10-01'
+DATE_END   = '2026-11-01'
 
-print(f"\n  按 request_url 分组 - 知识点/学习相关 TOP:")
-cursor.execute(f"""
-    SELECT request_url, COUNT(*) as cnt 
-    FROM `{LATEST_LOG}` 
-    WHERE request_url LIKE '%knowledge%' OR request_url LIKE '%point%' 
-       OR request_url LIKE '%study%' OR request_url LIKE '%learn%'
-       OR request_url LIKE '%course%' OR request_url LIKE '%chapter%'
-       OR request_url LIKE '%resource%' OR request_url LIKE '%ceping%'
-       OR request_url LIKE '%homework%'
-    GROUP BY request_url 
-    ORDER BY cnt DESC 
-    LIMIT 20
-""")
-for row in cursor.fetchall():
-    print(f"    {row[1]:>8,}  {row[0]}")
+print("="*80)
+print("各学段 2026年10月 视频点击率统计")
+print("口径: 点击率 = 被点击的课程数 / 有效课程总数 (is_folder=0, type_id IN 1,2)")
+print("="*80)
 
-# ============ 2. 历史请求日志汇总 ============
-print(f"\n{'='*70}")
-print("【2】请求日志 - 视频 API 历史汇总 (2026年至今)")
-print("="*70)
+# ============ 先拿到各 type_id 的有效课程总数 ============
+cursor.execute("USE tyeducation")
+print("\n【有效课程总基数】tyeducation.tifen_course (is_folder=0)")
+total_base = {}
+for tid in [1, 2]:
+    cursor.execute("SELECT COUNT(*) FROM tifen_course WHERE is_folder=0 AND type_id=%s", (tid,))
+    cnt = cursor.fetchone()[0]
+    total_base[tid] = cnt
+    print(f"  type_id={tid} {TYPE_LABEL[tid]}: {cnt:,}")
 
-cursor.execute("SHOW TABLES LIKE 'tifen_request_log_2026%'")
-tables_2026 = [t[0] for t in cursor.fetchall()]
+# 全部有效课程（不区分学段，主库是全量的）
+cursor.execute("SELECT COUNT(*) FROM tifen_course WHERE is_folder=0 AND type_id IN (1,2)")
+all_total = cursor.fetchone()[0]
+print(f"  合计: {all_total:,}")
 
-video_total = 0
-for t in tables_2026:
-    try:
+# ============ 分学段统计 ============
+print(f"\n{'='*80}")
+print("【各学段 2026-10 点击率明细】")
+print(f"{'='*80}")
+
+summary = []
+
+for stage_name, plate_id, log_table in STAGES:
+    print(f"\n{'─'*80}")
+    print(f"▶ {stage_name} (plate_id={plate_id}, 日志表={log_table})")
+    print(f"{'─'*80}")
+
+    cursor.execute("USE tongyiedu_analysis")
+
+    # 该学段 10月 总日志数 & 有效 course_id 日志数
+    cursor.execute(f"""
+        SELECT COUNT(*), SUM(CASE WHEN course_id > 0 THEN 1 ELSE 0 END),
+               COUNT(DISTINCT user_id), COUNT(DISTINCT CASE WHEN course_id > 0 THEN user_id END)
+        FROM `{log_table}`
+        WHERE log_date >= '{DATE_START}' AND log_date < '{DATE_END}'
+    """)
+    total_logs, valid_logs, total_users, active_users = cursor.fetchone()
+    print(f"  10月日志总条数: {total_logs:,}  有效(course_id>0): {valid_logs:,}")
+    print(f"  总活跃用户数: {total_users:,}  有课程行为用户: {active_users:,}")
+
+    cursor.execute("USE tyeducation")
+
+    stage_row = {'stage': stage_name}
+
+    for tid, tlabel in TYPE_LABEL.items():
+        # 该类型有效课程总数
+        cursor.execute("SELECT COUNT(*) FROM tifen_course WHERE is_folder=0 AND type_id=%s", (tid,))
+        total_courses = cursor.fetchone()[0]
+
+        # 被点击的 distinct course_id 数（10月内）
         cursor.execute(f"""
-            SELECT SUM(CASE WHEN request_url LIKE '%video%' THEN 1 ELSE 0 END),
-                   SUM(CASE WHEN request_url LIKE '%knowledge%' OR request_url LIKE '%point%' THEN 1 ELSE 0 END),
-                   SUM(CASE WHEN request_url LIKE '%ceping%' THEN 1 ELSE 0 END)
-            FROM `{t}`
-        """)
-        v, k, c = cursor.fetchone()
-        m = t.split('_')[-1]
-        print(f"  {t}: 视频请求={v or 0:>8,}  知识点={k or 0:>8,}  测评={c or 0:>8,}")
-        video_total += v or 0
-    except Exception as e:
-        print(f"  {t}: 错误 {e}")
+            SELECT COUNT(DISTINCT l.course_id)
+            FROM tongyiedu_analysis.`{log_table}` l
+            JOIN tyeducation.tifen_course c ON l.course_id = c.id
+            WHERE l.log_date >= '{DATE_START}' AND l.log_date < '{DATE_END}'
+              AND l.course_id > 0
+              AND c.is_folder = 0
+              AND c.type_id = %s
+        """, (tid,))
+        clicked_courses = cursor.fetchone()[0]
 
-# ============ 3. tifen_user_book_view 章节点击完整统计 ============
-print(f"\n{'='*70}")
-print("【3】章节点击完整汇总 (tifen_user_book_view 系列)")
-print("="*70)
+        # 总点击次数
+        cursor.execute(f"""
+            SELECT COUNT(*)
+            FROM tongyiedu_analysis.`{log_table}` l
+            JOIN tyeducation.tifen_course c ON l.course_id = c.id
+            WHERE l.log_date >= '{DATE_START}' AND l.log_date < '{DATE_END}'
+              AND l.course_id > 0
+              AND c.is_folder = 0
+              AND c.type_id = %s
+        """, (tid,))
+        total_clicks = cursor.fetchone()[0]
 
-all_view_tables = ['tifen_user_book_view_1', 'tifen_user_book_view_20', 'tifen_user_book_view_33']
+        # 点击用户数
+        cursor.execute(f"""
+            SELECT COUNT(DISTINCT l.user_id)
+            FROM tongyiedu_analysis.`{log_table}` l
+            JOIN tyeducation.tifen_course c ON l.course_id = c.id
+            WHERE l.log_date >= '{DATE_START}' AND l.log_date < '{DATE_END}'
+              AND l.course_id > 0
+              AND c.is_folder = 0
+              AND c.type_id = %s
+        """, (tid,))
+        clicking_users = cursor.fetchone()[0]
 
-print(f"\n  各平台明细:")
-print(f"  {'表名':<30} {'点击总数':>12} {'独立用户':>12} {'有效章节点击':>14}")
-print(f"  {'-'*72}")
-total_clicks = 0; total_valid = 0; total_users_set = set()
-for table in all_view_tables:
-    cursor.execute(f"SELECT COUNT(*), COUNT(DISTINCT user_id), SUM(CASE WHEN chapter_id > 0 THEN 1 ELSE 0 END) FROM `{table}`")
-    total, users, valid = cursor.fetchone()
-    total_clicks += total
-    total_valid += valid
-    cursor.execute(f"SELECT DISTINCT user_id FROM `{table}`")
-    for u in cursor.fetchall():
-        total_users_set.add(u[0])
-    print(f"  {table:<30} {total:>12,} {users:>12,} {valid:>14,}")
-print(f"  {'合计':<30} {total_clicks:>12,} {len(total_users_set):>12,} {total_valid:>14,}")
+        rate = (clicked_courses / total_courses * 100) if total_courses > 0 else 0
+        user_rate = (clicking_users / total_users * 100) if total_users > 0 else 0
 
-# 合并后 TOP 章节
-print(f"\n  全部合并后 TOP 20 章节点击:")
-union_sql = " UNION ALL ".join([f"SELECT chapter_id, book_id FROM `{t}` WHERE chapter_id > 0" for t in all_view_tables])
-cursor.execute(f"""
-    SELECT chapter_id, book_id, COUNT(*) as clicks
-    FROM ({union_sql}) all_views
-    GROUP BY chapter_id, book_id
-    ORDER BY clicks DESC
-    LIMIT 20
-""")
-print(f"  {'排名':>4}  {'chapter_id':>12}  {'book_id':>10}  {'点击数':>10}")
-print(f"  {'-'*42}")
-for i, row in enumerate(cursor.fetchall(), 1):
-    print(f"  {i:>4}  {row[0]:>12,}  {row[1]:>10,}  {row[2]:>10,}")
+        stage_row[tlabel] = {
+            'total_courses': total_courses,
+            'clicked_courses': clicked_courses,
+            'total_clicks': total_clicks,
+            'clicking_users': clicking_users,
+            'total_users': total_users,
+            'rate': rate,
+            'user_rate': user_rate,
+        }
 
-# ============ 4. log_user_study 学习日志 ============
-print(f"\n{'='*70}")
-print("【4】log_user_study 学习日志")
-print("="*70)
-for table in ['log_user_study_1', 'log_user_study_20', 'log_user_study_33', 'log_user_study_400']:
-    cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
-    cnt = cursor.fetchone()[0]
-    cursor.execute(f"DESCRIBE `{table}`")
-    cols = [c[0] for c in cursor.fetchall()]
-    print(f"\n  [{table}]  {cnt:,} 行  字段: {', '.join(cols)}")
-    cursor.execute(f"SELECT * FROM `{table}` ORDER BY id DESC LIMIT 3")
-    names = [d[0] for d in cursor.description]
-    for row in cursor.fetchall():
-        d = dict(zip(names, row))
-        # 截断
-        for k, v in list(d.items()):
-            if isinstance(v, str) and len(v) > 120:
-                d[k] = v[:120] + "..."
-        print(f"    示例: {d}")
+        print(f"\n  【{tlabel}】")
+        print(f"    有效课程总数: {total_courses:,}")
+        print(f"    被点击课程数: {clicked_courses:,}  ({rate:.2f}%)")
+        print(f"    总点击次数:   {total_clicks:,}")
+        print(f"    点击用户数:   {clicking_users:,} / {total_users:,} ({user_rate:.2f}%)")
 
-# ============ 5. log_user_course 课程日志 ============
-print(f"\n{'='*70}")
-print("【5】log_user_course 课程日志")
-print("="*70)
-for table in ['log_user_course_1', 'log_user_course_20', 'log_user_course_33', 'log_user_course_400']:
-    cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
-    cnt = cursor.fetchone()[0]
-    cursor.execute(f"DESCRIBE `{table}`")
-    cols = [c[0] for c in cursor.fetchall()]
-    print(f"\n  [{table}]  {cnt:,} 行  字段: {', '.join(cols)}")
-    cursor.execute(f"SELECT * FROM `{table}` ORDER BY id DESC LIMIT 2")
-    names = [d[0] for d in cursor.description]
-    for row in cursor.fetchall():
-        d = dict(zip(names, row))
-        for k, v in list(d.items()):
-            if isinstance(v, str) and len(v) > 120:
-                d[k] = v[:120] + "..."
-        print(f"    示例: {d}")
+    summary.append(stage_row)
 
-# ============ 6. 教师知识点投放统计 ============
-print(f"\n{'='*70}")
-print("【6】tifen_teacher_daily_statistics 教师日常统计")
-print("="*70)
-cursor.execute("SELECT COUNT(*) FROM tifen_teacher_daily_statistics")
-print(f"  总行数: {cursor.fetchone()[0]:,}")
-cursor.execute("SELECT * FROM tifen_teacher_daily_statistics ORDER BY id DESC LIMIT 3")
-names = [d[0] for d in cursor.description]
-for row in cursor.fetchall():
-    print(f"  {dict(zip(names, row))}")
+# ============ 汇总对比表 ============
+print(f"\n{'='*80}")
+print("【汇总对比】各学段 2026年10月 点击率")
+print(f"{'='*80}")
 
-print(f"\n  知识点投放 (knowledge_cast_num) 汇总:")
-cursor.execute("""
-    SELECT log_date, SUM(knowledge_cast_num) as total_cast
-    FROM tifen_teacher_daily_statistics
-    WHERE knowledge_cast_num > 0
-    GROUP BY log_date
-    ORDER BY log_date DESC
-    LIMIT 15
-""")
-for row in cursor.fetchall():
-    print(f"    {row[0]}  投放 {row[1]:>8,} 次")
+header = f"{'学段':>6}  | {'类型':>8}  | {'课程总数':>10}  | {'被点击数':>10}  | {'点击率':>8}  | {'点击次数':>10}  | {'点击用户':>8}  | {'用户占比':>8}"
+print(header)
+print('─' * len(header))
+
+for row in summary:
+    for tid in [1, 2]:
+        d = row[TYPE_LABEL[tid]]
+        print(
+            f"{row['stage']:>6}  | {TYPE_LABEL[tid]:>8}  | "
+            f"{d['total_courses']:>10,}  | {d['clicked_courses']:>10,}  | "
+            f"{d['rate']:>7.2f}%  | {d['total_clicks']:>10,}  | "
+            f"{d['clicking_users']:>8,}  | {d['user_rate']:>7.2f}%"
+        )
 
 cursor.close()
 conn.close()
 transport.close()
-print("\n查询完成!")
+print("\n统计完成!")

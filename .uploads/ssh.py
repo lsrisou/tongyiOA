@@ -12,11 +12,8 @@ import os
 import socket
 import pymysql as mysql
 import paramiko
-from sshtunnel import SSHTunnelForwarder
 
 # 从原始公共模块读取连接参数（不修改原文件）
-import importlib.util
-_spec = importlib.util.spec_from_file_location("_ssh_orig", "/workspace/public/ssh.py")
 # 注意：原 ssh.py 末尾会立即执行 SSHTunnelForwarder(...).start()，导入即副作用。
 # 这里只读取其源码中的常量，不直接 import 执行它。
 import re

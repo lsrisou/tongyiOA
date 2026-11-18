@@ -131,7 +131,7 @@ pa = np.array(person.split()[3]).astype(np.float32) / 255.0
 band = pa - cv2.erode((pa * 255).astype(np.uint8), np.ones((7, 7), np.uint8)).astype(np.float32) / 255.0
 band = cv2.GaussianBlur(band, (0, 0), 1.2)[..., None] * 0.35
 # no light wrap on the shoes / floor contact, otherwise the soles pick up a bright halo
-ramp = np.clip((np.arange(person.height, dtype=np.float32) - (person.height - 110)) / 60.0, 0, 1)[:, None, None]
+ramp = np.clip((np.arange(person.height, dtype=np.float32) - (person.height * 0.63)) / 45.0, 0, 1)[:, None, None]
 band = band * (1 - ramp)
 p_rgb = np.array(person.convert('RGB')).astype(np.float32)
 b_rgb = np.array(bgb.crop((px, py, px + person.width, py + person.height))).astype(np.float32)
@@ -146,7 +146,7 @@ rim = np.clip(pa2 - er2, 0, 1)
 rim = cv2.GaussianBlur(rim, (0, 0), 2.2)
 h2, w2 = pa2.shape
 xs = (np.arange(w2, dtype=np.float32)[None, :] / w2)
-side = np.clip(1.0 - xs / 0.5, 0, 1) ** 1.6
+side = np.clip(1.0 - xs / 0.32, 0, 1) ** 1.6
 ys = np.clip((np.arange(h2, dtype=np.float32)[:, None] - 40) / 90.0, 0, 1)
 ys *= np.clip(((h2 - 105) - np.arange(h2, dtype=np.float32)[:, None]) / 60.0, 0, 1)
 rim = (rim * side * ys * 0.6)[..., None]
@@ -157,6 +157,50 @@ q = q * (1 - rim) + day * rim
 q = q * (1 + wash)
 person = Image.fromarray(np.clip(q, 0, 255).astype(np.uint8)).convert('RGBA')
 person.putalpha(Image.fromarray((pa * 255).astype(np.uint8)))
+
+# 6d. the matte bridged the gap between the legs with the old background: clear that strip
+# so the office shows through instead of a grey slab
+pr = np.array(person.convert('RGB')).astype(np.float32)
+pf = np.array(person.split()[3])
+h4, w4 = pf.shape
+y0, y1 = int(h4 * 0.62), h4
+lumf = pr.mean(2)
+lk = np.zeros((h4, w4), np.uint8)
+xl, xr = int(w4 * 0.34), int(w4 * 0.66)
+for yy in range(y0, y1):
+    row = lumf[yy]
+    med = np.median(row[xl:xr])
+    lk[yy, xl:xr] = (row[xl:xr] > med + 42).astype(np.uint8) * 255
+lk = cv2.morphologyEx(lk, cv2.MORPH_CLOSE, np.ones((11, 11), np.uint8))
+lk = cv2.dilate(lk, np.ones((5, 5), np.uint8))
+pf[y0:y1][lk[y0:y1] > 0] = 0
+# pull the leg silhouette 2px into the opening with a dark inner-fabric edge, so the slit
+# is narrower and has a shadowed rim instead of a clean cut against the bright wall
+ring = cv2.dilate(lk, np.ones((5, 5), np.uint8)) - lk
+edge_col = np.array([26, 26, 30], np.float32)
+sele = ring[y0:y1] > 0
+pr_band = pr[y0:y1]
+pr_band[sele] = edge_col
+pf[y0:y1][sele] = 255
+pr[y0:y1] = pr_band
+person = Image.fromarray(np.clip(pr, 0, 255).astype(np.uint8)).convert('RGBA')
+person.putalpha(Image.fromarray(pf))
+# cut the bright wall fringe left along the opening: it reads as a glass-tube highlight
+pa_np = pf > 0
+g0 = np.zeros_like(pa_np)
+for yy in range(y0, h4):
+    cs = np.where(pa_np[yy])[0]
+    if cs.size > 1:
+        lo_, hi_ = cs.min(), cs.max()
+        sgm = pa_np[yy, lo_:hi_ + 1]
+        g0[yy, lo_ + 1:hi_] = ~sgm[1:-1]
+ring0 = cv2.dilate((g0 * 255).astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
+ring0 &= ~g0
+pf[ring0 & (pf < 250)] = 0
+# feather the inner-leg edge so the opening is not a razor-sharp slot
+fe = cv2.GaussianBlur(pf[int(h4*0.60):int(h4*0.93)].astype(np.float32), (0, 0), 0.9)
+pf[int(h4*0.60):int(h4*0.93)] = fe.astype(np.uint8)
+person.putalpha(Image.fromarray(pf))
 
 # 7. paste person
 # harden the shoe soles so the contact edge stays crisp instead of fading into the floor
@@ -169,6 +213,33 @@ sub[sub < 140] = 0
 person.putalpha(Image.fromarray(pav))
 
 bg.paste(person, (px, py), person)
+
+# 8. inner-leg gap: dim what shows through between the legs and close the top of the slit,
+# otherwise the bright slit reads as a cut-out seam instead of two legs standing apart
+pa3 = np.array(person.split()[3]) > 0
+h3, w3 = pa3.shape
+gap = np.zeros((h3, w3), np.uint8)
+g_start = int(h3 * 0.60)
+for yy in range(g_start, h3):
+    cols = np.where(pa3[yy])[0]
+    if cols.size > 1:
+        lo, hi = cols.min(), cols.max()
+        seg = pa3[yy, lo:hi + 1]
+        gap[yy, lo + 1:hi] = (~seg[1:-1]).astype(np.uint8)
+gap = cv2.dilate(gap, np.ones((3, 3), np.uint8))
+gap_img = Image.fromarray(gap * 255).filter(ImageFilter.GaussianBlur(2.4))
+gap_full = Image.new('L', bg.size, 0)
+gap_full.paste(gap_img, (px, py))
+grows = np.where(gap.any(1))[0]
+wide = np.where(gap.sum(1) >= 8)[0]
+gy0 = py + (int(wide.min()) if wide.size else int(grows.min()) if grows.size else g_start)
+t = np.clip((np.arange(bg.size[1], dtype=np.float32) - gy0) / max(1.0, person.height * 0.155), 0, 1)[:, None, None]
+# the room behind the legs is metres away: give it a shallow depth-of-field so the
+# opening stops reading as a crisp slot
+bg = Image.composite(bg.filter(ImageFilter.GaussianBlur(3.6)), bg, gap_full)
+gv = np.array(gap_full).astype(np.float32)[..., None] / 255.0
+occl = gv * (0.76 - 0.06 * t)
+bg = Image.fromarray(np.clip(np.array(bg).astype(np.float32) * (1 - occl), 0, 255).astype(np.uint8))
 
 bg.save(OUT, quality=95, subsampling=0)
 print('saved', OUT, bg.size, 'person box', (px, py, px + person.width, py + person.height))

@@ -24,19 +24,20 @@ gains = np.array([172 / 210.4, 168 / 200.4, 166 / 188.6], np.float32)
 rgb *= gains
 np.clip(rgb, 0, 255, out=rgb)
 
-# 2b. edge colour decontamination: give semi-transparent edge pixels the colour
-# of the nearest fully-opaque pixel so no wall/floor colour bleeds into edges
+# 2b. edge colour decontamination: every anti-aliased boundary pixel takes the
+# colour of the nearest well-inside pixel, so no wall colour bleeds into edges
 from scipy import ndimage
-solid = a > 245
-if not solid.any():
-    solid = a > a.max() - 1
-_, (iy, ix) = ndimage.distance_transform_edt(~solid, return_indices=True)
-edge = (a > 0) & (~solid)
+solid = a > 250
+core = cv2.erode(solid.astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
+if not core.any():
+    core = solid if solid.any() else a > a.max() - 1
+_, (iy, ix) = ndimage.distance_transform_edt(~core, return_indices=True)
+edge = (a > 0) & (~core)
 rgb[edge] = rgb[iy[edge], ix[edge]]
 
 # 3. erode edge slightly to remove background fringe, then feather
-alpha = Image.fromarray(a).filter(ImageFilter.MinFilter(3))
-alpha = alpha.filter(ImageFilter.GaussianBlur(0.8))
+alpha = Image.fromarray(a).filter(ImageFilter.MinFilter(5))
+alpha = alpha.filter(ImageFilter.GaussianBlur(0.7))
 
 # darken the very bottom rows of the cutout (shoe soles) so no floor colour rim shows
 anp = np.array(alpha)
@@ -59,7 +60,7 @@ bbox = person.getbbox()
 person = person.crop(bbox)
 
 # 4. scale & position
-H = 640
+H = 800
 scale = H / person.height
 person = person.resize((round(person.width * scale), H), Image.LANCZOS)
 # very slight softening + sensor noise to sit in the same optical conditions as the room photo
@@ -71,7 +72,7 @@ person = pn
 
 bg = Image.open(BG).convert('RGB')
 W, BGH = bg.size
-cx, feet_y = 830, 1245
+cx, feet_y = 853, 1248
 px = cx - person.width // 2
 py = feet_y - person.height
 
@@ -95,8 +96,8 @@ tight_full.paste(tight, (px, py + person.height - 70))
 
 soft = Image.new('L', bg.size, 0)
 d = ImageDraw.Draw(soft)
-d.ellipse([cx - 165, feet_y - 30, cx + 165, feet_y + 32], fill=110)
-d.ellipse([cx - 115, feet_y - 22, cx + 115, feet_y + 24], fill=165)
+d.ellipse([cx - 200, feet_y - 34, cx + 200, feet_y + 36], fill=110)
+d.ellipse([cx - 140, feet_y - 24, cx + 140, feet_y + 26], fill=165)
 soft = soft.filter(ImageFilter.GaussianBlur(13))
 
 fs = ImageChops.lighter(tight_full, soft)

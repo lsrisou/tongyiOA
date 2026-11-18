@@ -139,6 +139,25 @@ p_rgb = p_rgb * (1 - band) + b_rgb * band
 person = Image.fromarray(np.clip(p_rgb, 0, 255).astype(np.uint8)).convert('RGBA')
 person.putalpha(Image.fromarray((pa * 255).astype(np.uint8)))
 
+# 6c. window rim light: cool daylight from the left corridor catches the left contour
+pa2 = np.array(person.split()[3]).astype(np.float32) / 255.0
+er2 = cv2.erode((pa2 * 255).astype(np.uint8), np.ones((9, 9), np.uint8)).astype(np.float32) / 255.0
+rim = np.clip(pa2 - er2, 0, 1)
+rim = cv2.GaussianBlur(rim, (0, 0), 2.2)
+h2, w2 = pa2.shape
+xs = (np.arange(w2, dtype=np.float32)[None, :] / w2)
+side = np.clip(1.0 - xs / 0.5, 0, 1) ** 1.6
+ys = np.clip((np.arange(h2, dtype=np.float32)[:, None] - 40) / 90.0, 0, 1)
+ys *= np.clip(((h2 - 105) - np.arange(h2, dtype=np.float32)[:, None]) / 60.0, 0, 1)
+rim = (rim * side * ys * 0.6)[..., None]
+wash = (side * ys * pa2 * 0.06)[..., None]
+day = np.array([206, 220, 236], np.float32)
+q = np.array(person.convert('RGB')).astype(np.float32)
+q = q * (1 - rim) + day * rim
+q = q * (1 + wash)
+person = Image.fromarray(np.clip(q, 0, 255).astype(np.uint8)).convert('RGBA')
+person.putalpha(Image.fromarray((pa * 255).astype(np.uint8)))
+
 # 7. paste person
 # harden the shoe soles so the contact edge stays crisp instead of fading into the floor
 pa_img = person.split()[3]

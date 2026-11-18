@@ -60,7 +60,7 @@ bbox = person.getbbox()
 person = person.crop(bbox)
 
 # 4. scale & position
-H = 800
+H = 700
 scale = H / person.height
 person = person.resize((round(person.width * scale), H), Image.LANCZOS)
 # very slight softening + sensor noise to sit in the same optical conditions as the room photo

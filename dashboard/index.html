@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>统一AI · 智慧教育数据驾驶舱</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#02060f}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    color:#cfe6ff;
+    display:flex;align-items:center;justify-content:center;
+  }
+  #stage{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #screen{
+    width:1920px;height:1080px;flex:none;position:relative;
+    padding:18px 20px 20px;
+    transform-origin:center center;
+    background:
+      radial-gradient(ellipse 1200px 620px at 50% -12%,rgba(38,132,255,.30),transparent 62%),
+      radial-gradient(ellipse 900px 500px at 100% 110%,rgba(0,208,255,.12),transparent 60%),
+      radial-gradient(ellipse 900px 500px at 0% 110%,rgba(120,70,255,.14),transparent 60%),
+      linear-gradient(rgba(60,140,255,.045) 1px,transparent 1px) 0 0/56px 56px,
+      linear-gradient(90deg,rgba(60,140,255,.045) 1px,transparent 1px) 0 0/56px 56px,
+      #040a18;
+    display:flex;flex-direction:column;
+  }
+  #screen::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55));
+  }
+  /* ---------- header ---------- */
+  header{height:86px;flex:none;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2}
+  .brand{display:flex;align-items:center;gap:12px;width:460px}
+  .logo{width:42px;height:42px;position:relative;flex:none}
+  .logo i{position:absolute;inset:0;border:1px solid rgba(60,200,255,.65);transform:rotate(45deg);border-radius:6px;box-shadow:0 0 14px rgba(56,216,255,.35) inset}
+  .logo i:nth-child(2){inset:7px;transform:rotate(0deg);border-color:rgba(56,216,255,.35)}
+  .brand .txt b{display:block;font-size:19px;letter-spacing:.12em;color:#e6f4ff;font-weight:600}
+  .brand .txt span{font-size:11px;letter-spacing:.22em;color:#5f8cb8}
+  .status{display:flex;align-items:center;gap:8px;margin-left:20px;padding:5px 12px;border:1px solid rgba(52,211,153,.35);border-radius:20px;font-size:11px;letter-spacing:.12em;color:#6ee7b7;background:rgba(16,185,129,.08)}
+  .status .dot{width:6px;height:6px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399;animation:blink 1.6s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+  .title-wrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative;height:100%}
+  .title-wrap::before,.title-wrap::after{
+    content:"";position:absolute;top:44px;height:1px;width:210px;
+    background:linear-gradient(90deg,transparent,rgba(72,200,255,.75))
+  }
+  .title-wrap::before{left:20px}
+  .title-wrap::after{right:20px;transform:scaleX(-1)}
+  h1{
+    font-size:40px;letter-spacing:.16em;font-weight:700;
+    background:linear-gradient(180deg,#ffffff 8%,#a8e4ff 46%,#38bdf8 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 0 34px rgba(56,189,248,.35);
+  }
+  h1 em{font-style:normal;font-size:16px;letter-spacing:.42em;display:block;text-align:center;
+    background:none;color:#5b8fbd;margin-top:4px;font-weight:400}
+
+  .clock{width:460px;display:flex;align-items:center;justify-content:flex-end;gap:22px}
+  .clock .date{text-align:right;line-height:1.5}
+  .clock .date b{font-size:15px;color:#9ec8e8;font-weight:500;letter-spacing:.06em;display:block}
+  .clock .date span{font-size:11px;color:#54779c;letter-spacing:.18em}
+  .clock .time{font-family:"DIN Alternate","Bahnschrift",Consolas,monospace;font-size:34px;letter-spacing:.04em;
+    color:#e8f7ff;text-shadow:0 0 18px rgba(56,189,248,.55)}
+  .clock .time small{font-size:12px;color:#5b8fbd;letter-spacing:.14em;display:block;text-align:right}
+
+  /* ---------- layout ---------- */
+  main{flex:1;display:grid;grid-template-columns:460px 1fr 420px;gap:16px;min-height:0;position:relative;z-index:2}
+  .col{display:flex;flex-direction:column;gap:16px;min-height:0}
+  .col.left{display:grid;grid-template-rows:1fr 1.12fr .86fr}
+  .col.center{display:grid;grid-template-rows:112px 1fr 250px}
+  .col.right{display:grid;grid-template-rows:300px 1fr 250px}
+
+  .panel{position:relative;display:flex;flex-direction:column;min-height:0;padding:12px 14px 14px;
+    background:linear-gradient(180deg,rgba(13,42,86,.55),rgba(5,18,40,.72));
+    border:1px solid rgba(64,158,255,.2);border-radius:4px;
+    box-shadow:inset 0 0 30px rgba(30,110,255,.10),0 0 16px rgba(0,0,0,.35);
+    overflow:hidden;
+  }
+  .panel::before,.panel::after{content:"";position:absolute;width:14px;height:14px;pointer-events:none}
+  .panel::before{left:-1px;top:-1px;border-left:2px solid #38d8ff;border-top:2px solid #38d8ff}
+  .panel::after{right:-1px;bottom:-1px;border-right:2px solid #38d8ff;border-bottom:2px solid #38d8ff;opacity:.55}
+  .ptitle{flex:none;display:flex;align-items:center;gap:9px;height:26px;margin-bottom:8px}
+  .ptitle::before{content:"";width:4px;height:15px;border-radius:2px;
+    background:linear-gradient(180deg,#3de6ff,#1d6dff);box-shadow:0 0 10px rgba(61,230,255,.85)}
+  .ptitle h3{font-size:16px;font-weight:600;letter-spacing:.08em;color:#dcf1ff}
+  .ptitle .sub{margin-left:auto;font-size:11px;letter-spacing:.1em;color:#527ea8}
+  .body{flex:1;min-height:0;position:relative}
+  canvas{display:block;width:100%;height:100%}
+
+  /* ---------- kpi ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .kpi{position:relative;padding:10px 16px;display:flex;flex-direction:column;justify-content:center;
+    background:linear-gradient(135deg,rgba(26,80,160,.38),rgba(6,20,46,.62));
+    border:1px solid rgba(64,158,255,.22);border-radius:4px;overflow:hidden}
+  .kpi::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:2px;
+    background:linear-gradient(180deg,#3de6ff,#1d6dff);box-shadow:0 0 12px rgba(61,230,255,.8)}
+  .kpi .label{font-size:12px;letter-spacing:.14em;color:#7fa6c9}
+  .kpi .val{font-family:"DIN Alternate","Bahnschrift",Consolas,monospace;font-size:34px;font-weight:700;letter-spacing:.02em;
+    color:#f0fbff;text-shadow:0 0 20px rgba(56,189,248,.45);line-height:1.25}
+  .kpi .val small{font-size:15px;color:#7dd3fc;margin-left:3px;letter-spacing:.04em}
+  .kpi .delta{font-size:11px;letter-spacing:.05em;color:#4ade80}
+  .kpi .delta.down{color:#f87171}
+  .kpi .spark{position:absolute;right:10px;bottom:8px;width:74px;height:30px;opacity:.75}
+
+  /* ---------- left ---------- */
+  .rank{display:flex;flex-direction:column;justify-content:space-around;height:100%;gap:4px}
+  .rank .row{display:flex;align-items:center;gap:10px;flex:1;min-height:0}
+  .rank .no{width:20px;height:20px;flex:none;font-size:11px;display:flex;align-items:center;justify-content:center;
+    border-radius:3px;background:rgba(56,189,248,.12);color:#7dd3fc;border:1px solid rgba(56,189,248,.3)}
+  .rank .row:nth-child(1) .no{background:rgba(251,191,36,.16);color:#fbbf24;border-color:rgba(251,191,36,.45)}
+  .rank .row:nth-child(2) .no{background:rgba(203,213,225,.14);color:#cbd5e1;border-color:rgba(203,213,225,.4)}
+  .rank .row:nth-child(3) .no{background:rgba(251,146,60,.14);color:#fb923c;border-color:rgba(251,146,60,.4)}
+  .rank .name{width:96px;flex:none;font-size:12px;color:#a9c9e4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rank .track{flex:1;height:9px;border-radius:5px;background:rgba(80,150,230,.14);overflow:hidden;position:relative}
+  .rank .fill{height:100%;width:0;border-radius:5px;
+    background:linear-gradient(90deg,rgba(29,109,255,.55),#38d8ff);
+    box-shadow:0 0 10px rgba(56,216,255,.55);transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
+  .rank .num{width:52px;text-align:right;flex:none;font-family:"DIN Alternate",Consolas,monospace;font-size:13px;color:#d9efff}
+
+  .rings{display:grid;grid-template-columns:repeat(3,1fr);height:100%;align-items:center}
+  .ring{display:flex;flex-direction:column;align-items:center;gap:2px}
+  .ring .cv{width:96px;height:96px;position:relative}
+  .ring .cv span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:"DIN Alternate",Consolas,monospace;font-size:18px;color:#eaf8ff;text-shadow:0 0 12px rgba(56,189,248,.6)}
+  .ring .cap{font-size:11px;letter-spacing:.1em;color:#7ba3c7}
+
+  /* ---------- center ---------- */
+  .hero-chart{position:relative}
+  .chart-tag{position:absolute;left:16px;top:10px;font-size:11px;letter-spacing:.14em;color:#5b8fbd;z-index:3}
+  .legend{position:absolute;right:14px;top:8px;display:flex;gap:16px;z-index:3;font-size:11px;color:#8fb6d8;letter-spacing:.06em}
+  .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+  .bottom-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;min-height:0}
+  .mini-stats{display:flex;flex-direction:column;justify-content:center;gap:10px;height:100%;padding:0 4px}
+  .mini-stats .line{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#8fb6d8}
+  .mini-stats .line b{font-family:"DIN Alternate",Consolas,monospace;font-size:20px;color:#e6f7ff;font-weight:600}
+  .mini-stats .bar{height:6px;border-radius:4px;background:rgba(80,150,230,.14);overflow:hidden;margin-top:-4px}
+  .mini-stats .bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#1d6dff,#38e8ff)}
+
+  /* ---------- right ---------- */
+  .donut-wrap{display:flex;height:100%;align-items:center;gap:6px}
+  .donut-wrap .cv{width:52%;height:100%;position:relative}
+  .donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+  .donut-center b{font-family:"DIN Alternate",Consolas,monospace;font-size:24px;color:#f0fbff;text-shadow:0 0 16px rgba(56,189,248,.5)}
+  .donut-center span{font-size:10px;letter-spacing:.16em;color:#628eb5}
+  .donut-legend{flex:1;display:flex;flex-direction:column;justify-content:center;gap:9px;padding-right:6px}
+  .donut-legend .li{display:flex;align-items:center;gap:8px;font-size:12px;color:#a9c9e4}
+  .donut-legend .li i{width:8px;height:8px;border-radius:2px;flex:none}
+  .donut-legend .li b{margin-left:auto;font-family:"DIN Alternate",Consolas,monospace;color:#e6f7ff;font-weight:600}
+
+  .events{height:100%;overflow:hidden;display:flex;flex-direction:column;gap:7px;mask-image:linear-gradient(180deg,transparent,#000 8%,#000 92%,transparent)}
+  .ev{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.55;animation:evIn .5s ease both}
+  .ev .t{flex:none;font-family:Consolas,monospace;font-size:11px;color:#4f7ba3;padding-top:1px}
+  .ev .d{flex:none;width:6px;height:6px;border-radius:50%;margin-top:6px;box-shadow:0 0 8px currentColor}
+  .ev .m{color:#a9c9e4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ev .m em{font-style:normal;color:#7dd3fc}
+  @keyframes evIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+
+  .ai-list{display:flex;flex-direction:column;justify-content:space-around;height:100%}
+  .ai-row{display:flex;align-items:center;gap:10px;font-size:12px;color:#9fc3e2}
+  .ai-row .n{width:66px;flex:none}
+  .ai-row .tr{flex:1;height:8px;border-radius:4px;background:rgba(80,150,230,.14);overflow:hidden}
+  .ai-row .tr i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#7c3aed,#38bdf8);box-shadow:0 0 10px rgba(56,189,248,.5)}
+  .ai-row .v{width:40px;text-align:right;font-family:"DIN Alternate",Consolas,monospace;color:#e6f7ff}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="screen">
+    <header>
+      <div class="brand">
+        <div class="logo"><i></i><i></i></div>
+        <div class="txt"><b>UNIAI · EDU</b><span>DATA VISUAL CENTER</span></div>
+        <div class="status"><span class="dot"></span>SYSTEM ONLINE</div>
+      </div>
+      <div class="title-wrap">
+        <h1>智慧教育数据驾驶舱<em>SMART EDUCATION OPERATION CENTER</em></h1>
+      </div>
+      <div class="clock">
+        <div class="date"><b id="dateText">2026年11月20日 星期五</b><span>ASIA / SHANGHAI</span></div>
+        <div class="time"><span id="timeText">00:00:00</span><small>实时同步</small></div>
+      </div>
+    </header>
+
+    <main>
+      <!-- LEFT -->
+      <section class="col left">
+        <div class="panel">
+          <div class="ptitle"><h3>近七日学习趋势</h3><span class="sub">LEARNING TREND</span></div>
+          <div class="body"><canvas id="cTrend"></canvas></div>
+        </div>
+        <div class="panel">
+          <div class="ptitle"><h3>院系活跃度排行</h3><span class="sub">TOP 6</span></div>
+          <div class="body">
+            <div class="rank" id="rankList"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ptitle"><h3>平台资源负载</h3><span class="sub">REAL-TIME</span></div>
+          <div class="body">
+            <div class="rings" id="ringList"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CENTER -->
+      <section class="col center">
+        <div class="kpis">
+          <div class="kpi">
+            <div class="label">今日访问量</div>
+            <div class="val"><span class="cnt" data-target="128642">0</span></div>
+            <div class="delta">▲ 12.6% 环比昨日</div>
+            <canvas class="spark" data-spark="3,6,5,8,7,11,10,13"></canvas>
+          </div>
+          <div class="kpi">
+            <div class="label">实时在线用户</div>
+            <div class="val"><span class="cnt" data-target="32417">0</span></div>
+            <div class="delta">▲ 8.3% 近 1 小时</div>
+            <canvas class="spark" data-spark="4,5,7,6,9,8,10,12"></canvas>
+          </div>
+          <div class="kpi">
+            <div class="label">课程完成率</div>
+            <div class="val"><span class="cnt" data-target="86.4" data-dec="1">0</span><small>%</small></div>
+            <div class="delta">▲ 2.1% 本周提升</div>
+            <canvas class="spark" data-spark="6,7,6,8,9,9,10,11"></canvas>
+          </div>
+          <div class="kpi">
+            <div class="label">AI 能力调用</div>
+            <div class="val"><span class="cnt" data-target="512408">0</span></div>
+            <div class="delta">▲ 23.8% 峰值增长</div>
+            <canvas class="spark" data-spark="3,5,4,7,9,8,11,14"></canvas>
+          </div>
+        </div>
+
+        <div class="panel hero-chart">
+          <div class="chart-tag">PLATFORM REAL-TIME TRAFFIC / 24H</div>
+          <div class="legend">
+            <span><i style="background:#38e8ff;box-shadow:0 0 8px #38e8ff"></i>访问量</span>
+            <span><i style="background:#a78bfa"></i>学习时长</span>
+            <span><i style="background:#34d399"></i>AI 调用</span>
+          </div>
+          <div class="body"><canvas id="cMain"></canvas></div>
+        </div>
+
+        <div class="bottom-grid">
+          <div class="panel">
+            <div class="ptitle"><h3>核心运营指标</h3><span class="sub">CORE METRICS</span></div>
+            <div class="body">
+              <div class="mini-stats" id="miniStats"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="ptitle"><h3>区域在线占比</h3><span class="sub">REGION</span></div>
+            <div class="body"><canvas id="cRegion"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT -->
+      <section class="col right">
+        <div class="panel">
+          <div class="ptitle"><h3>访问渠道占比</h3><span class="sub">CHANNEL</span></div>
+          <div class="body">
+            <div class="donut-wrap">
+              <div class="cv">
+                <canvas id="cDonut"></canvas>
+                <div class="donut-center"><b id="donutTotal">0</b><span>TOTAL SESSION</span></div>
+              </div>
+              <div class="donut-legend" id="donutLegend"></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ptitle"><h3>实时事件流</h3><span class="sub">LIVE FEED</span></div>
+          <div class="body"><div class="events" id="eventList"></div></div>
+        </div>
+        <div class="panel">
+          <div class="ptitle"><h3>AI 能力调用分布</h3><span class="sub">AI SERVICE</span></div>
+          <div class="body"><div class="ai-list" id="aiList"></div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var screenEl = document.getElementById('screen');
+
+  /* ---------- auto scale ---------- */
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    screenEl.style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  /* ---------- clock ---------- */
+  var WEEK = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  function tickClock() {
+    var d = new Date();
+    document.getElementById('timeText').textContent =
+      pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+    document.getElementById('dateText').textContent =
+      d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + WEEK[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ---------- canvas helpers ---------- */
+  function prep(cv) {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return null;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+    }
+    var ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    return { ctx: ctx, w: w, h: h };
+  }
+  function ease(t) { return 1 - Math.pow(1 - t, 3); }
+  function smooth(ctx, pts) {
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) {
+      var p0 = pts[i - 1], p1 = pts[i], mx = (p0.x + p1.x) / 2;
+      ctx.bezierCurveTo(mx, p0.y, mx, p1.y, p1.x, p1.y);
+    }
+  }
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, h / 2, w / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  /* ---------- count up ---------- */
+  var counters = [];
+  document.querySelectorAll('.cnt').forEach(function (el) {
+    counters.push({
+      el: el,
+      target: parseFloat(el.getAttribute('data-target')),
+      dec: parseInt(el.getAttribute('data-dec') || '0', 10)
+    });
+  });
+  (function runCounters() {
+    var t0 = performance.now(), dur = 1900;
+    function frame(now) {
+      var p = ease(Math.min((now - t0) / dur, 1));
+      counters.forEach(function (c) {
+        var v = c.target * p;
+        c.el.textContent = c.dec ? v.toFixed(c.dec)
+          : Math.round(v).toLocaleString('en-US');
+      });
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  })();
+
+  /* ---------- sparklines ---------- */
+  document.querySelectorAll('.spark').forEach(function (cv) {
+    var vals = cv.getAttribute('data-spark').split(',').map(Number);
+    var max = Math.max.apply(null, vals), min = Math.min.apply(null, vals);
+    var t0 = performance.now(), dur = 1600;
+    function draw(now) {
+      var r = prep(cv);
+      if (!r) { requestAnimationFrame(draw); return; }
+      var p = ease(Math.min((now - t0) / dur, 1));
+      var w = r.w, h = r.h, ctx = r.ctx;
+      var pts = vals.map(function (v, i) {
+        return {
+          x: (i / (vals.length - 1)) * w,
+          y: h - 4 - ((v - min) / (max - min || 1)) * (h - 12)
+        };
+      });
+      var visible = Math.max(2, Math.ceil(pts.length * p));
+      var seg = pts.slice(0, visible);
+      var g = ctx.createLinearGradient(0, 0, w, 0);
+      g.addColorStop(0, 'rgba(56,216,255,.35)');
+      g.addColorStop(1, 'rgba(56,216,255,.95)');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 1.6;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      smooth(ctx, seg);
+      ctx.stroke();
+      var last = seg[seg.length - 1];
+      ctx.fillStyle = '#7dd3fc';
+      ctx.shadowColor = '#38e8ff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(last.x, last.y, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      if (p < 1) requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  });
+
+  /* ---------- trend line chart (left) ---------- */
+  var trendCv = document.getElementById('cTrend');
+  (function () {
+    var labels = ['周一','周二','周三','周四','周五','周六','周日'];
+    var s1 = [8200, 9100, 8600, 10400, 11200, 12600, 11800];
+    var s2 = [4200, 4800, 4500, 5600, 6100, 6800, 6600];
+    var t0 = performance.now(), dur = 1800;
+
+    function draw(now) {
+      var r = prep(trendCv);
+      if (!r) { requestAnimationFrame(draw); return; }
+      var ctx = r.ctx, w = r.w, h = r.h;
+      var m = { l: 42, r: 12, t: 14, b: 24 };
+      var iw = w - m.l - m.r, ih = h - m.t - m.b;
+      var max = 14000, p = ease(Math.min((now - t0) / dur, 1));
+
+      ctx.font = '10px Consolas, monospace';
+      ctx.textBaseline = 'middle';
+      for (var g = 0; g <= 4; g++) {
+        var y = m.t + (ih / 4) * g;
+        ctx.strokeStyle = 'rgba(90,160,240,.12)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke();
+        ctx.fillStyle = 'rgba(110,150,190,.75)';
+        ctx.textAlign = 'right';
+        ctx.fillText(((max - (max / 4) * g) / 1000).toFixed(1) + 'k', m.l - 7, y);
+      }
+      ctx.textAlign = 'center';
+      labels.forEach(function (lb, i) {
+        var x = m.l + (iw / (labels.length - 1)) * i;
+        ctx.fillStyle = 'rgba(110,150,190,.8)';
+        ctx.fillText(lb, x, h - 9);
+      });
+
+      function series(data, color, fill) {
+        var pts = data.map(function (v, i) {
+          return {
+            x: m.l + (iw / (data.length - 1)) * i,
+            y: m.t + ih - (v / max) * ih * p
+          };
+        });
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(m.l, 0, iw * p, h);
+        ctx.clip();
+        if (fill) {
+          var fg = ctx.createLinearGradient(0, m.t, 0, m.t + ih);
+          fg.addColorStop(0, 'rgba(56,216,255,.35)');
+          fg.addColorStop(1, 'rgba(56,216,255,0)');
+          ctx.fillStyle = fg;
+          ctx.beginPath();
+          smooth(ctx, pts);
+          ctx.lineTo(pts[pts.length - 1].x, m.t + ih);
+          ctx.lineTo(pts[0].x, m.t + ih);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        smooth(ctx, pts);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = color;
+        pts.forEach(function (pt) {
+          ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.4, 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.restore();
+      }
+      series(s2, 'rgba(167,139,250,.95)', false);
+      series(s1, '#38e8ff', true);
+      if (p < 1) requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  })();
+
+  /* ---------- main realtime chart ---------- */
+  var mainCv = document.getElementById('cMain');
+  (function () {
+    var labels = [], a = [], b = [], c = [];
+    for (var i = 0; i < 24; i++) {
+      labels.push(pad2(i) + ':00');
+      var t = i / 23;
+      a.push(38 + 34 * Math.sin(t * Math.PI * 1.15 - 0.4) + 9 * Math.sin(t * 9) + (i > 7 && i < 22 ? 12 : 0));
+      b.push(24 + 20 * Math.sin(t * Math.PI * 1.05 - 0.9) + 6 * Math.cos(t * 7));
+      c.push(18 + 28 * Math.sin(t * Math.PI * 1.2 - 0.2) + 8 * Math.sin(t * 11 + 1));
+    }
+    function norm(arr, lo, hi) {
+      var mn = Math.min.apply(null, arr), mx = Math.max.apply(null, arr);
+      return arr.map(function (v) { return lo + ((v - mn) / (mx - mn || 1)) * (hi - lo); });
+    }
+    var sa = norm(a, 10, 300), sb = norm(b, 10, 300), sc = norm(c, 10, 300);
+    var start = performance.now();
+
+    function draw(now) {
+      var r = prep(mainCv);
+      if (!r) { requestAnimationFrame(draw); return; }
+      var ctx = r.ctx, w = r.w, h = r.h;
+      var m = { l: 44, r: 18, t: 30, b: 26 };
+      var iw = w - m.l - m.r, ih = h - m.t - m.b;
+      var p = ease(Math.min((now - start) / 1700, 1));
+
+      ctx.font = '10px Consolas, monospace';
+      ctx.textBaseline = 'middle';
+      for (var g = 0; g <= 4; g++) {
+        var y = m.t + (ih / 4) * g;
+        ctx.strokeStyle = 'rgba(90,160,240,.12)';
+        ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke();
+        ctx.fillStyle = 'rgba(110,150,190,.75)';
+        ctx.textAlign = 'right';
+        ctx.fillText((28 - g * 7) + 'k', m.l - 8, y);
+      }
+      labels.forEach(function (lb, i) {
+        if (i % 3 !== 0) return;
+        var x = m.l + (iw / (labels.length - 1)) * i;
+        ctx.strokeStyle = 'rgba(90,160,240,.06)';
+        ctx.beginPath(); ctx.moveTo(x, m.t); ctx.lineTo(x, m.t + ih); ctx.stroke();
+        ctx.fillStyle = 'rgba(110,150,190,.8)';
+        ctx.textAlign = 'center';
+        ctx.fillText(lb, x, h - 10);
+      });
+
+      function toPts(data) {
+        return data.map(function (v, i) {
+          return {
+            x: m.l + (iw / (data.length - 1)) * i,
+            y: m.t + ih - (v / 300) * ih
+          };
+        });
+      }
+      var pa = toPts(sa), pb = toPts(sb), pc = toPts(sc);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(m.l, 0, iw * p, h);
+      ctx.clip();
+
+      // area for series A
+      var grad = ctx.createLinearGradient(0, m.t, 0, m.t + ih);
+      grad.addColorStop(0, 'rgba(56,232,255,.34)');
+      grad.addColorStop(.55, 'rgba(56,232,255,.10)');
+      grad.addColorStop(1, 'rgba(56,232,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      smooth(ctx, pa);
+      ctx.lineTo(pa[pa.length - 1].x, m.t + ih);
+      ctx.lineTo(pa[0].x, m.t + ih);
+      ctx.closePath();
+      ctx.fill();
+
+      function line(pts, color, blur) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
+        ctx.shadowColor = color;
+        ctx.shadowBlur = blur;
+        ctx.beginPath();
+        smooth(ctx, pts);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+      line(pc, 'rgba(52,211,153,.9)', 8);
+      line(pb, 'rgba(167,139,250,.95)', 8);
+      line(pa, '#38e8ff', 14);
+      ctx.restore();
+
+        // moving pulse dot along series A
+      if (p >= 1) {
+        var phase = ((now - start) % 7000) / 7000;
+        var fi = phase * (pa.length - 1);
+        var i0 = Math.floor(fi), i1 = Math.min(i0 + 1, pa.length - 1), fr = fi - i0;
+        var x = pa[i0].x + (pa[i1].x - pa[i0].x) * fr;
+        var y = pa[i0].y + (pa[i1].y - pa[i0].y) * fr;
+        var rg = ctx.createRadialGradient(x, y, 0, x, y, 14);
+        rg.addColorStop(0, 'rgba(150,245,255,.95)');
+        rg.addColorStop(.4, 'rgba(56,232,255,.45)');
+        rg.addColorStop(1, 'rgba(56,232,255,0)');
+        ctx.fillStyle = rg;
+        ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#eafcff';
+        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+      }
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  })();
+
+  /* ---------- region bars (center bottom) ---------- */
+  (function () {
+    var cv = document.getElementById('cRegion');
+    var data = [
+      { n: '华东', v: 92 }, { n: '华南', v: 78 }, { n: '华北', v: 66 },
+      { n: '西南', v: 54 }, { n: '华中', v: 41 }
+    ];
+    var t0 = performance.now(), dur = 1600;
+    function draw(now) {
+      var r = prep(cv);
+      if (!r) { requestAnimationFrame(draw); return; }
+      var ctx = r.ctx, w = r.w, h = r.h;
+      var p = ease(Math.min((now - t0) / dur, 1));
+      var left = 46, right = 38, top = 6, gap = 6;
+      var rowH = (h - top * 2) / data.length;
+      ctx.font = '12px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.textBaseline = 'middle';
+      data.forEach(function (d, i) {
+        var y = top + rowH * i + rowH / 2;
+        ctx.fillStyle = 'rgba(140,180,215,.9)';
+        ctx.textAlign = 'right';
+        ctx.fillText(d.n, left - 10, y);
+        var tw = w - left - right;
+        ctx.fillStyle = 'rgba(80,150,230,.12)';
+        roundRect(ctx, left, y - 5, tw, 10, 5);
+        ctx.fill();
+        var bw = tw * (d.v / 100) * p;
+        var gd = ctx.createLinearGradient(left, 0, left + tw, 0);
+        gd.addColorStop(0, 'rgba(29,109,255,.75)');
+        gd.addColorStop(1, '#38e8ff');
+        ctx.fillStyle = gd;
+        ctx.shadowColor = 'rgba(56,232,255,.55)';
+        ctx.shadowBlur = 10;
+        roundRect(ctx, left, y - 5, Math.max(bw, 6), 10, 5);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        // moving highlight
+        if (p >= 1 && bw > 20) {
+          var hx = left + ((now / 12 + i * 90) % (bw - 14));
+          var hg = ctx.createLinearGradient(hx, 0, hx + 14, 0);
+          hg.addColorStop(0, 'rgba(255,255,255,0)');
+          hg.addColorStop(.5, 'rgba(255,255,255,.55)');
+          hg.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.fillStyle = hg;
+          ctx.fillRect(hx, y - 5, 14, 10);
+        }
+        ctx.fillStyle = '#d9efff';
+        ctx.textAlign = 'left';
+        ctx.fillText(d.v + '%', left + tw + 8, y);
+      });
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  })();
+
+  /* ---------- rank bars ---------- */
+  (function () {
+    var wrap = document.getElementById('rankList');
+    var data = [
+      { n: '计算机学院', v: 9820 }, { n: '人工智能学院', v: 8740 },
+      { n: '数学与统计学院', v: 7320 }, { n: '外国语学院', v: 6180 },
+      { n: '经济管理学院', v: 5240 }, { n: '艺术设计学院', v: 4310 }
+    ];
+    var max = Math.max.apply(null, data.map(function (d) { return d.v; }));
+    data.forEach(function (d, i) {
+      var row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = '<span class="no">' + (i + 1) + '</span>' +
+        '<span class="name" title="' + d.n + '">' + d.n + '</span>' +
+        '<span class="track"><span class="fill"></span></span>' +
+        '<span class="num">' + d.v.toLocaleString('en-US') + '</span>';
+      wrap.appendChild(row);
+    });
+    setTimeout(function () {
+      wrap.querySelectorAll('.fill').forEach(function (el, i) {
+        el.style.width = (data[i].v / max * 100).toFixed(1) + '%';
+      });
+    }, 260);
+  })();
+
+  /* ---------- rings ---------- */
+  (function () {
+    var wrap = document.getElementById('ringList');
+    var data = [{ n: 'CPU', v: 62, c: '#38e8ff' }, { n: '内存', v: 78, c: '#a78bfa' }, { n: '带宽', v: 45, c: '#34d399' }];
+    var cvs = [];
+    data.forEach(function (d) {
+      var box = document.createElement('div');
+      box.className = 'ring';
+      box.innerHTML = '<div class="cv"><canvas></canvas><span>0%</span></div><div class="cap">' +
+        d.n + ' 使用率</div>';
+      wrap.appendChild(box);
+      cvs.push({ cv: box.querySelector('canvas'), span: box.querySelector('span'), d: d });
+    });
+    var t0 = performance.now();
+    function draw(now) {
+      var p = ease(Math.min((now - t0) / 1700, 1));
+      cvs.forEach(function (o) {
+        var r = prep(o.cv);
+        if (!r) return;
+        var ctx = r.ctx, w = r.w, h = r.h, cx = w / 2, cy = h / 2, rad = 38;
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(90,160,240,.14)';
+        ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
+        var end = -Math.PI / 2 + (o.d.v / 100) * Math.PI * 2 * p;
+        ctx.strokeStyle = o.d.c;
+        ctx.shadowColor = o.d.c;
+        ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(cx, cy, rad, -Math.PI / 2, end); ctx.stroke();
+        ctx.shadowBlur = 0;
+        o.span.textContent = Math.round(o.d.v * p) + '%';
+        o.span.style.color = '#eaf8ff';
+      });
+      if (p < 1) requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  })();
+
+  /* ---------- donut ---------- */
+  (function () {
+    var cv = document.getElementById('cDonut');
+    var data = [
+      { n: '移动端', v: 42, c: '#38e8ff' },
+      { n: 'Web 端', v: 28, c: '#6366f1' },
+      { n: '小程序', v: 18, c: '#a78bfa' },
+      { n: '开放 API', v: 12, c: '#34d399' }
+    ];
+    var lg = document.getElementById('donutLegend');
+    data.forEach(function (d) {
+      var el = document.createElement('div');
+      el.className = 'li';
+      el.innerHTML = '<i style="background:' + d.c + ';box-shadow:0 0 8px ' + d.c + '"></i>' +
+        d.n + '<b>' + d.v + '%</b>';
+      lg.appendChild(el);
+    });
+    var totalEl = document.getElementById('donutTotal');
+    var t0 = performance.now(), dur = 1600;
+    function draw(now) {
+      var r = prep(cv);
+      if (!r) { requestAnimationFrame(draw); return; }
+      var ctx = r.ctx, w = r.w, h = r.h;
+      var cx = w / 2, cy = h / 2, rad = Math.min(w, h) * 0.38;
+      var p = ease(Math.min((now - t0) / dur, 1));
+      var total = data.reduce(function (s, d) { return s + d.v; }, 0);
+      var startAngle = -Math.PI / 2;
+      ctx.lineWidth = Math.min(w, h) * 0.13;
+      ctx.lineCap = 'butt';
+      ctx.strokeStyle = 'rgba(90,160,240,.10)';
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
+      data.forEach(function (d) {
+        var sweep = (d.v / total) * Math.PI * 2 * p;
+        var gap = 0.035;
+        ctx.strokeStyle = d.c;
+        ctx.shadowColor = d.c;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rad, startAngle + gap / 2, startAngle + sweep - gap / 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        startAngle += (d.v / total) * Math.PI * 2 * p;
+      });
+      totalEl.textContent = Math.round(128642 * p).toLocaleString('en-US');
+      if (p < 1) requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  })();
+
+  /* ---------- mini stats ---------- */
+  (function () {
+    var wrap = document.getElementById('miniStats');
+    var data = [
+      { n: '日均学习时长', v: '48.6', u: ' min', p: 82 },
+      { n: '课程资源总量', v: '12,480', u: ' 门', p: 68 },
+      { n: '师生互动次数', v: '86,320', u: ' 次', p: 74 },
+      { n: '智能推荐命中率', v: '93.2', u: ' %', p: 93 }
+    ];
+    data.forEach(function (d) {
+      var el = document.createElement('div');
+      el.innerHTML = '<div class="line"><span>' + d.n + '</span><b>' + d.v + d.u + '</b></div>' +
+        '<div class="bar"><i></i></div>';
+      wrap.appendChild(el);
+    });
+    setTimeout(function () {
+      wrap.querySelectorAll('.bar i').forEach(function (el, i) {
+        el.style.transition = 'width 1.5s cubic-bezier(.2,.8,.2,1)';
+        el.style.width = data[i].p + '%';
+      });
+    }, 300);
+  })();
+
+  /* ---------- ai list ---------- */
+  (function () {
+    var wrap = document.getElementById('aiList');
+    var data = [
+      { n: '智能问答', v: 92 }, { n: '作业批改', v: 84 }, { n: '学情分析', v: 76 },
+      { n: '语音评测', v: 68 }, { n: '内容生成', v: 61 }
+    ];
+    data.forEach(function (d) {
+      var el = document.createElement('div');
+      el.className = 'ai-row';
+      el.innerHTML = '<span class="n">' + d.n + '</span><span class="tr"><i></i></span>' +
+        '<span class="v">' + d.v + '%</span>';
+      wrap.appendChild(el);
+    });
+    setTimeout(function () {
+      wrap.querySelectorAll('.tr i').forEach(function (el, i) {
+        el.style.transition = 'width 1.6s cubic-bezier(.2,.8,.2,1)';
+        el.style.width = data[i].v + '%';
+      });
+    }, 340);
+  })();
+
+  /* ---------- event feed ---------- */
+  (function () {
+    var list = document.getElementById('eventList');
+    var seeds = [
+      { c: '#38e8ff', m: '人工智能学院 <em>新增 12 条</em>智能答疑记录' },
+      { c: '#34d399', m: '课程《机器学习导论》<em>完成率突破 92%</em>' },
+      { c: '#fbbf24', m: '监测到 <em>华东节点</em> 并发上升，已自动扩容' },
+      { c: '#a78bfa', m: '开放 API <em>新增接入</em> 3 个校园应用' },
+      { c: '#38e8ff', m: '教师 <em>李明</em> 发布新课件资源' },
+      { c: '#f87171', m: '检测到异常登录尝试，已触发风控拦截' },
+      { c: '#34d399', m: '语音评测服务 <em>P95 延迟 210ms</em>，状态正常' },
+      { c: '#a78bfa', m: '智能推荐引擎完成 <em>今日第 4 次</em>模型更新' },
+      { c: '#38e8ff', m: '在线直播课堂 <em>《数据结构》</em> 开课中' },
+      { c: '#fbbf24', m: '存储集群使用率达 <em>78%</em>，建议扩容' }
+    ];
+    var idx = 0;
+    function nowStr() {
+      var d = new Date();
+      return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+    }
+    function add(item, prepend) {
+      var el = document.createElement('div');
+      el.className = 'ev';
+      el.innerHTML = '<span class="t">' + nowStr() + '</span>' +
+        '<span class="d" style="background:' + item.c + ';color:' + item.c + '"></span>' +
+        '<span class="m">' + item.m + '</span>';
+      if (prepend) list.insertBefore(el, list.firstChild);
+      else list.appendChild(el);
+      while (list.children.length > 9) list.removeChild(list.lastChild);
+    }
+    seeds.slice(0, 6).forEach(function (s) { add(s, false); });
+    idx = 6;
+    setInterval(function () {
+      add(seeds[idx % seeds.length], true);
+      idx++;
+    }, 3200);
+  })();
+})();
+</script>
+</body>
+</html>

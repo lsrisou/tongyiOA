@@ -18,10 +18,13 @@ function demo() {
     source: 'demo',
     updatedAt: new Date().toISOString(),
     kpis: {
-      visits: 128642, visitsDelta: 12.6,
-      online: 32417, onlineDelta: 8.3,
-      completion: 86.4, completionDelta: 2.1,
-      aiCalls: 512408, aiCallsDelta: 23.8
+      // visits 仅用于渠道环图中心的演示总数，不在 KPI 卡片展示
+      visits: 128642,
+      trialHours: 36.5,
+      regularHours: 218.5,
+      conversionRate: 18.6,
+      schoolChargeAmount: 52680.00,
+      trialPayAmount: 3990.00
     },
     trend: {
       labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],

@@ -20,6 +20,24 @@ function getPool() {
   return pool;
 }
 
+const TODAY_LESSON = [
+  'deleted_at IS NULL',
+  'start_time >= UNIX_TIMESTAMP(CURDATE())',
+  'start_time < UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY)'
+].join(' AND ');
+
+const TODAY_ORDER = [
+  'deleted_at IS NULL',
+  'created_at >= CURDATE()',
+  'created_at < CURDATE() + INTERVAL 1 DAY',
+  'state = 2'
+].join(' AND ');
+
+async function scalar(db, sql) {
+  const [rows] = await db.query(sql);
+  return rows.length ? Number(rows[0].value) || 0 : 0;
+}
+
 /**
  * 返回大屏所需的全部指标。
  * 数据库连接通过环境变量注入：DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME。
@@ -31,20 +49,43 @@ async function loadMetrics() {
   try {
     const db = getPool();
     const data = demo();
+
+    const trialHoursSql =
+      'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
+      'WHERE ' + TODAY_LESSON + ' AND trial_lesson_id <> 0';
+    const regularHoursSql =
+      'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
+      'WHERE ' + TODAY_LESSON + ' AND trial_lesson_id = 0';
+    const conversionSql =
+      'SELECT COUNT(*) AS total, COALESCE(SUM(convert_contract_id <> 0), 0) AS converted ' +
+      'FROM de_trial_hour_lessons WHERE ' + TODAY_LESSON;
+    const schoolChargeSql =
+      "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders WHERE " + TODAY_ORDER +
+      " AND type_id = 'school_point_charge'";
+    const trialPaySql =
+      "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders WHERE " + TODAY_ORDER +
+      " AND type_id = 'trial_lesson'";
+
+    const [trialHours, regularHours, conversionRows, schoolChargeAmount, trialPayAmount] =
+      await Promise.all([
+        scalar(db, trialHoursSql),
+        scalar(db, regularHoursSql),
+        db.query(conversionSql).then(([rows]) => rows[0]),
+        scalar(db, schoolChargeSql),
+        scalar(db, trialPaySql)
+      ]);
+
+    const totalTrials = Number(conversionRows.total) || 0;
+    const converted = Number(conversionRows.converted) || 0;
+
+    data.kpis.trialHours = trialHours;
+    data.kpis.regularHours = regularHours;
+    data.kpis.conversionRate = totalTrials ? converted / totalTrials * 100 : 0;
+    data.kpis.schoolChargeAmount = schoolChargeAmount;
+    data.kpis.trialPayAmount = trialPayAmount;
+    data.kpis.conversionDetail = { converted: converted, total: totalTrials };
     data.source = 'db';
-
-    // TODO: 用真实 SQL 替换下列占位逻辑（等待表结构与口径确认）
-    // 示例：
-    // const [rows] = await db.query(
-    //   'SELECT COUNT(*) AS c FROM user_log WHERE created_at >= CURDATE()'
-    // );
-    // data.kpis.visits = rows[0].c;
-
-    const [rows] = await db.query('SELECT 1 AS ok');
-    if (!rows || !rows.length) throw new Error('empty result');
-
-    data.source = 'demo';
-    data.note = 'sql_pending';
+    data.updatedAt = new Date().toISOString();
     return data;
   } catch (err) {
     console.error('[db] query failed:', err.message);

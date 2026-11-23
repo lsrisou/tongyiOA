@@ -1,0 +1,17 @@
+{
+  "name": "edu-dashboard-server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "智慧教育数据大屏服务端",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20 <21"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.11.3",
+    "ssh2": "^1.16.0"
+  }
+}

@@ -35,31 +35,22 @@ const CONF = readConfig();
 const DB = CONF.db;
 const SSH = CONF.ssh;
 
-const TODAY_LESSON = [
-  'deleted_at IS NULL',
-  'start_time >= UNIX_TIMESTAMP(CURDATE())',
-  'start_time < UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY)'
-].join(' AND ');
+const TODAY_PERIOD = {
+  start: 'CURDATE()',
+  end: 'CURDATE() + INTERVAL 1 DAY'
+};
+const YESTERDAY_PERIOD = {
+  start: 'CURDATE() - INTERVAL 1 DAY',
+  end: 'CURDATE()'
+};
 
-const TODAY_ORDER = [
-  'deleted_at IS NULL',
-  'created_at >= CURDATE()',
-  'created_at < CURDATE() + INTERVAL 1 DAY',
-  'state = 2'
-].join(' AND ');
-
-const YESTERDAY_LESSON = [
-  'deleted_at IS NULL',
-  'start_time >= UNIX_TIMESTAMP(CURDATE() - INTERVAL 1 DAY)',
-  'start_time < UNIX_TIMESTAMP(CURDATE())'
-].join(' AND ');
-
-const YESTERDAY_ORDER = [
-  'deleted_at IS NULL',
-  'created_at >= CURDATE() - INTERVAL 1 DAY',
-  'created_at < CURDATE()',
-  'state = 2'
-].join(' AND ');
+function periodWhere(field, p) {
+  // start_time 是 bigint 时间戳，其余（finished_at/updated_at/created_at）是 datetime
+  if (field === 'start_time') {
+    return 'start_time >= UNIX_TIMESTAMP(' + p.start + ') AND start_time < UNIX_TIMESTAMP(' + p.end + ')';
+  }
+  return field + ' >= ' + p.start + ' AND ' + field + ' < ' + p.end;
+}
 
 let conn = null;
 let lastError = null;
@@ -221,22 +212,29 @@ async function loadEvents(connection) {
   });
 }
 
-async function collect(connection, lessonWhere, orderWhere) {
+async function collect(connection, period) {
   const trialHours = await scalar(connection,
     'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
-    'WHERE ' + lessonWhere + ' AND trial_lesson_id <> 0');
+    'WHERE deleted_at IS NULL AND ' + periodWhere('start_time', period) + ' AND trial_lesson_id <> 0');
   const regularHours = await scalar(connection,
     'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
-    'WHERE ' + lessonWhere + ' AND trial_lesson_id = 0');
+    'WHERE deleted_at IS NULL AND ' + periodWhere('start_time', period) + ' AND trial_lesson_id = 0');
+
+  // 转化率：分子=period 内 state 变 4（updated_at），分母=period 内完课（finished_at）
   const [conversionRows] = await connection.query(
-    'SELECT COUNT(*) AS total, ' +
-    'COALESCE(SUM(pay_state = 1 AND state = 4 AND student_id > 0), 0) AS converted ' +
-    'FROM de_trial_hour_lessons WHERE ' + lessonWhere);
+    'SELECT ' +
+    '(SELECT COUNT(*) FROM de_trial_hour_lessons WHERE deleted_at IS NULL ' +
+    ' AND ' + periodWhere('finished_at', period) + ') AS total, ' +
+    '(SELECT COUNT(*) FROM de_trial_hour_lessons WHERE pay_state = 1 AND state = 4 AND student_id > 0 ' +
+    ' AND ' + periodWhere('updated_at', period) + ') AS converted');
+
   const schoolChargeAmount = await scalar(connection,
-    "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders WHERE " + orderWhere +
+    "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders " +
+    "WHERE deleted_at IS NULL AND state = 2 AND " + periodWhere('created_at', period) +
     " AND type_id = 'school_point_charge'");
   const trialPayAmount = await scalar(connection,
-    "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders WHERE " + orderWhere +
+    "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders " +
+    "WHERE deleted_at IS NULL AND state = 2 AND " + periodWhere('created_at', period) +
     " AND type_id = 'trial_lesson'");
 
   const total = Number(conversionRows[0].total) || 0;
@@ -261,8 +259,8 @@ async function loadMetrics() {
 
   try {
     const db = await getConnection();
-    const today = await collect(db, TODAY_LESSON, TODAY_ORDER);
-    const yesterday = await collect(db, YESTERDAY_LESSON, YESTERDAY_ORDER);
+    const today = await collect(db, TODAY_PERIOD);
+    const yesterday = await collect(db, YESTERDAY_PERIOD);
 
     const data = demo();
     data.kpis.trialHours = today.trialHours;

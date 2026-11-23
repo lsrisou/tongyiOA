@@ -165,6 +165,62 @@ async function scalar(connection, sql) {
   return rows.length ? Number(rows[0].value) || 0 : 0;
 }
 
+const TEACH_LEVELS = {
+  0: '助教',
+  10: '教练',
+  20: '银牌教练',
+  30: '金牌教练',
+  35: '白金教练',
+  40: '王牌教练',
+  43: '钻石教练',
+  45: '初级专家',
+  50: '高级专家',
+  60: '特级专家'
+};
+
+function actionLevel(action) {
+  if (/退课|退约|退款|驳回|取消|禁用|删除/.test(action)) return 'error';
+  if (/转化成功|通过|签署|新增|创建|报名/.test(action)) return 'success';
+  if (/修改|编辑|审核|调整/.test(action)) return 'warn';
+  return 'info';
+}
+
+function parseCourseId(content) {
+  if (!content) return 0;
+  try {
+    const obj = JSON.parse(String(content).replace(/^\uFEFF/, '').trim());
+    let request = Array.isArray(obj.request) ? obj.request[0] : obj.request;
+    if (request) {
+      const id = Number(request.id || request.ID);
+      if (id) return id;
+    }
+    const old = Array.isArray(obj.old) ? obj.old[0] : obj.old;
+    return old ? Number(old.ID || old.id) || 0 : 0;
+  } catch (err) {
+    return 0;
+  }
+}
+
+async function loadEvents(connection) {
+  const [rows] = await connection.query(
+    "SELECT l.action, DATE_FORMAT(l.created_at, '%H:%i') AS time_text, " +
+    "LEFT(l.content, 2000) AS content, u.name AS user_name, u.teach_level " +
+    'FROM de_admin_action_logs l ' +
+    'LEFT JOIN de_admin_users u ON u.id = IF(l.user_id <> 0, l.user_id, l.creator) ' +
+    'ORDER BY l.id DESC LIMIT 20'
+  );
+  return rows.map(function (row) {
+    return {
+      time: row.time_text,
+      action: row.action,
+      level: actionLevel(row.action || ''),
+      operator: row.user_name || '系统',
+      role: TEACH_LEVELS[Number(row.teach_level)] || '',
+      courseId: parseCourseId(row.content)
+    };
+  });
+}
+
 async function collect(connection, lessonWhere, orderWhere) {
   const trialHours = await scalar(connection,
     'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
@@ -216,6 +272,12 @@ async function loadMetrics() {
     data.kpis.trialPayAmount = today.trialPayAmount;
     data.kpis.conversionDetail = today.conversionDetail;
     data.yesterday = yesterday;
+    try {
+      data.events = await loadEvents(db);
+    } catch (eventErr) {
+      console.error('[db] events query failed:', eventErr.message);
+      data.events = [];
+    }
     data.source = 'db';
     data.updatedAt = new Date().toISOString();
     return data;

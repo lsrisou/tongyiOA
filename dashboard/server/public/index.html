@@ -366,7 +366,16 @@
       regularHours: 218.5,
       conversionRate: 18.6,
       schoolChargeAmount: 52680.00,
-      trialPayAmount: 3990.00
+      trialPayAmount: 3990.00,
+      conversionDetail: { converted: 9, total: 48 }
+    },
+    yesterday: {
+      trialHours: 41.0,
+      regularHours: 302.5,
+      conversionRate: 14.6,
+      schoolChargeAmount: 38600.00,
+      trialPayAmount: 2150.00,
+      conversionDetail: { converted: 14, total: 96 }
     },
     trend: {
       labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
@@ -418,18 +427,21 @@
 
   /* ---------- KPI ---------- */
   var kpiDefs = [
-    { key: 'trialHours', el: 'kpiTrialHours', dec: 1, deltaEl: 'deltaTrialHours', caption: '今日累计' },
-    { key: 'regularHours', el: 'kpiRegularHours', dec: 1, deltaEl: 'deltaRegularHours', caption: '今日累计' },
-    { key: 'conversionRate', el: 'kpiConversionRate', dec: 1, deltaEl: 'deltaConversionRate', caption: '已转正 / 今日体验课' },
-    { key: 'schoolChargeAmount', el: 'kpiSchoolChargeAmount', dec: 2, deltaEl: 'deltaSchoolChargeAmount', caption: '今日已支付' },
-    { key: 'trialPayAmount', el: 'kpiTrialPayAmount', dec: 2, deltaEl: 'deltaTrialPayAmount', caption: '今日已支付' }
+    { key: 'trialHours', el: 'kpiTrialHours', dec: 1, deltaEl: 'deltaTrialHours', unit: ' 课时' },
+    { key: 'regularHours', el: 'kpiRegularHours', dec: 1, deltaEl: 'deltaRegularHours', unit: ' 课时' },
+    { key: 'conversionRate', el: 'kpiConversionRate', dec: 1, deltaEl: 'deltaConversionRate', unit: '%', isRate: true },
+    { key: 'schoolChargeAmount', el: 'kpiSchoolChargeAmount', dec: 2, deltaEl: 'deltaSchoolChargeAmount', unit: ' 元' },
+    { key: 'trialPayAmount', el: 'kpiTrialPayAmount', dec: 2, deltaEl: 'deltaTrialPayAmount', unit: ' 元' }
   ];
   var kpiCurrent = {};
 
-  function renderNumber(el, v, dec) {
-    el.textContent = dec
+  function formatNum(v, dec) {
+    return dec
       ? Number(v).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec })
       : Math.round(v).toLocaleString('en-US');
+  }
+  function renderNumber(el, v, dec) {
+    el.textContent = formatNum(v, dec);
   }
   function tweenNumber(el, from, to, dec, dur) {
     var t0 = performance.now();
@@ -453,10 +465,16 @@
       }, first ? 2000 : 1000);
 
       var del = $(d.deltaEl);
-      var detail = DATA.kpis.conversionDetail;
-      del.textContent = d.key === 'conversionRate' && detail
-        ? '已转正 ' + detail.converted + ' / ' + detail.total
-        : d.caption;
+      var y = DATA.yesterday || {};
+      var yv = y[d.key];
+      if (d.isRate) {
+        var detail = DATA.kpis.conversionDetail || { converted: 0, total: 0 };
+        var yd = y.conversionDetail;
+        del.textContent = '昨日 ' + formatNum(yv == null ? 0 : yv, 1) + '%' +
+          (yd ? ' · 今日 ' + detail.converted + '/' + detail.total : '');
+      } else {
+        del.textContent = '昨日 ' + (yv == null ? '--' : formatNum(yv, d.dec) + (d.unit || ''));
+      }
       del.className = 'delta';
     });
   }

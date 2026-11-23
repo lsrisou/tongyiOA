@@ -48,6 +48,19 @@ const TODAY_ORDER = [
   'state = 2'
 ].join(' AND ');
 
+const YESTERDAY_LESSON = [
+  'deleted_at IS NULL',
+  'start_time >= UNIX_TIMESTAMP(CURDATE() - INTERVAL 1 DAY)',
+  'start_time < UNIX_TIMESTAMP(CURDATE())'
+].join(' AND ');
+
+const YESTERDAY_ORDER = [
+  'deleted_at IS NULL',
+  'created_at >= CURDATE() - INTERVAL 1 DAY',
+  'created_at < CURDATE()',
+  'state = 2'
+].join(' AND ');
+
 let conn = null;
 let lastError = null;
 let lastErrorAt = 0;
@@ -152,6 +165,37 @@ async function scalar(connection, sql) {
   return rows.length ? Number(rows[0].value) || 0 : 0;
 }
 
+async function collect(connection, lessonWhere, orderWhere) {
+  const trialHours = await scalar(connection,
+    'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
+    'WHERE ' + lessonWhere + ' AND trial_lesson_id <> 0');
+  const regularHours = await scalar(connection,
+    'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
+    'WHERE ' + lessonWhere + ' AND trial_lesson_id = 0');
+  const [conversionRows] = await connection.query(
+    'SELECT COUNT(*) AS total, ' +
+    'COALESCE(SUM(pay_state = 1 AND state = 4 AND student_id > 0), 0) AS converted ' +
+    'FROM de_trial_hour_lessons WHERE ' + lessonWhere);
+  const schoolChargeAmount = await scalar(connection,
+    "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders WHERE " + orderWhere +
+    " AND type_id = 'school_point_charge'");
+  const trialPayAmount = await scalar(connection,
+    "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders WHERE " + orderWhere +
+    " AND type_id = 'trial_lesson'");
+
+  const total = Number(conversionRows[0].total) || 0;
+  const converted = Number(conversionRows[0].converted) || 0;
+
+  return {
+    trialHours: trialHours,
+    regularHours: regularHours,
+    conversionRate: total ? converted / total * 100 : 0,
+    conversionDetail: { converted: converted, total: total },
+    schoolChargeAmount: schoolChargeAmount,
+    trialPayAmount: trialPayAmount
+  };
+}
+
 /**
  * 返回大屏所需的全部指标。
  * 连接参数来自 DASH_CONFIG（JSON）或独立环境变量，未配置或查询失败时回落到演示数据。
@@ -161,40 +205,17 @@ async function loadMetrics() {
 
   try {
     const db = await getConnection();
-
-    const trialHoursSql =
-      'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
-      'WHERE ' + TODAY_LESSON + ' AND trial_lesson_id <> 0';
-    const regularHoursSql =
-      'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
-      'WHERE ' + TODAY_LESSON + ' AND trial_lesson_id = 0';
-    const conversionSql =
-      'SELECT COUNT(*) AS total, ' +
-      'COALESCE(SUM(pay_state = 1 AND state = 4 AND student_id > 0), 0) AS converted ' +
-      'FROM de_trial_hour_lessons WHERE ' + TODAY_LESSON;
-    const schoolChargeSql =
-      "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders WHERE " + TODAY_ORDER +
-      " AND type_id = 'school_point_charge'";
-    const trialPaySql =
-      "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders WHERE " + TODAY_ORDER +
-      " AND type_id = 'trial_lesson'";
-
-    const trialHours = await scalar(db, trialHoursSql);
-    const regularHours = await scalar(db, regularHoursSql);
-    const [conversionRows] = await db.query(conversionSql);
-    const schoolChargeAmount = await scalar(db, schoolChargeSql);
-    const trialPayAmount = await scalar(db, trialPaySql);
-
-    const totalTrials = Number(conversionRows[0].total) || 0;
-    const converted = Number(conversionRows[0].converted) || 0;
+    const today = await collect(db, TODAY_LESSON, TODAY_ORDER);
+    const yesterday = await collect(db, YESTERDAY_LESSON, YESTERDAY_ORDER);
 
     const data = demo();
-    data.kpis.trialHours = trialHours;
-    data.kpis.regularHours = regularHours;
-    data.kpis.conversionRate = totalTrials ? converted / totalTrials * 100 : 0;
-    data.kpis.schoolChargeAmount = schoolChargeAmount;
-    data.kpis.trialPayAmount = trialPayAmount;
-    data.kpis.conversionDetail = { converted: converted, total: totalTrials };
+    data.kpis.trialHours = today.trialHours;
+    data.kpis.regularHours = today.regularHours;
+    data.kpis.conversionRate = today.conversionRate;
+    data.kpis.schoolChargeAmount = today.schoolChargeAmount;
+    data.kpis.trialPayAmount = today.trialPayAmount;
+    data.kpis.conversionDetail = today.conversionDetail;
+    data.yesterday = yesterday;
     data.source = 'db';
     data.updatedAt = new Date().toISOString();
     return data;

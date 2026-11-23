@@ -22,9 +22,10 @@ function demo() {
       visits: 128642,
       trialHours: 36.5,
       regularHours: 218.5,
-      conversionRate: 18.6,
+      conversionRate: 18.8,
       schoolChargeAmount: 52680.00,
-      trialPayAmount: 3990.00
+      trialPayAmount: 3990.00,
+      conversionDetail: { converted: 9, total: 48 }
     },
     trend: {
       labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],

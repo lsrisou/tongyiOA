@@ -57,7 +57,8 @@ async function loadMetrics() {
       'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
       'WHERE ' + TODAY_LESSON + ' AND trial_lesson_id = 0';
     const conversionSql =
-      'SELECT COUNT(*) AS total, COALESCE(SUM(convert_contract_id <> 0), 0) AS converted ' +
+      'SELECT COUNT(*) AS total, ' +
+      'COALESCE(SUM(pay_state = 1 AND state = 4 AND student_id > 0), 0) AS converted ' +
       'FROM de_trial_hour_lessons WHERE ' + TODAY_LESSON;
     const schoolChargeSql =
       "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders WHERE " + TODAY_ORDER +

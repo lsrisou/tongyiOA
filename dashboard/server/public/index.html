@@ -446,6 +446,11 @@
       var from = first ? 0 : (kpiCurrent[d.key] == null ? 0 : kpiCurrent[d.key]);
       kpiCurrent[d.key] = target;
       tweenNumber($(d.el), from, target, d.dec, first ? 1900 : 900);
+      // 页面被后台节流时 rAF 会暂停，用定时器兜底直接写入最终值
+      if (d.timer) clearTimeout(d.timer);
+      d.timer = setTimeout(function () {
+        renderNumber($(d.el), target, d.dec);
+      }, first ? 2000 : 1000);
 
       var del = $(d.deltaEl);
       var detail = DATA.kpis.conversionDetail;

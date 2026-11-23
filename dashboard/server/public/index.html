@@ -101,8 +101,12 @@
   .kpi .val{font-family:"DIN Alternate","Bahnschrift",Consolas,monospace;font-size:28px;font-weight:700;letter-spacing:.02em;
     color:#f0fbff;text-shadow:0 0 20px rgba(56,189,248,.45);line-height:1.25}
   .kpi .val small{font-size:15px;color:#7dd3fc;margin-left:3px;letter-spacing:.04em}
-  .kpi .delta{font-size:11px;letter-spacing:.05em;color:#7fa6c9}
-  .kpi .delta.down{color:#f87171}
+  .kpi .delta{font-size:11px;letter-spacing:.03em;color:#7fa6c9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi .delta .yest{color:#4ade80}
+  .kpi .delta .mom.up{color:#4ade80}
+  .kpi .delta .mom.down{color:#f87171}
+  .kpi .delta .mom.flat{color:#7fa6c9}
+  .kpi .delta .today{color:#7fa6c9}
   .kpi .spark{position:absolute;right:10px;bottom:8px;width:74px;height:30px;opacity:.75}
 
   /* ---------- left ---------- */
@@ -467,15 +471,31 @@
       var del = $(d.deltaEl);
       var y = DATA.yesterday || {};
       var yv = y[d.key];
-      if (d.isRate) {
-        var detail = DATA.kpis.conversionDetail || { converted: 0, total: 0 };
-        var yd = y.conversionDetail;
-        del.textContent = '昨日 ' + formatNum(yv == null ? 0 : yv, 1) + '%' +
-          (yd ? ' · 今日 ' + detail.converted + '/' + detail.total : '');
-      } else {
-        del.textContent = '昨日 ' + (yv == null ? '--' : formatNum(yv, d.dec) + (d.unit || ''));
+      var diff = null;
+      if (yv != null) {
+        if (d.isRate) {
+          diff = target - yv;
+        } else if (Number(yv) !== 0) {
+          diff = (target - yv) / Number(yv) * 100;
+        }
       }
-      del.className = 'delta';
+      if (yv == null) {
+        del.innerHTML = '<span class="yest">昨日 --</span>';
+      } else {
+        var momClass = diff == null || diff === 0 ? 'flat' : (diff > 0 ? 'up' : 'down');
+        var momText = diff == null ? '—' : (diff >= 0 ? '+' : '') +
+          diff.toFixed(1) + (d.isRate ? 'pp' : '%');
+        var yestText = d.isRate
+          ? '昨日 ' + formatNum(yv, 1) + '%'
+          : '昨日 ' + formatNum(yv, d.dec) + (d.unit || '');
+        var todayText = '';
+        if (d.isRate) {
+          var detail = DATA.kpis.conversionDetail || { converted: 0, total: 0 };
+          todayText = '<span class="today"> · 今日 ' + detail.converted + '/' + detail.total + '</span>';
+        }
+        del.innerHTML = '<span class="yest">' + yestText + '</span>' +
+          '<span class="mom ' + momClass + '"> · 环比 ' + momText + '</span>' + todayText;
+      }
     });
   }
   updateKpis(true);

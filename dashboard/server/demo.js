@@ -108,6 +108,12 @@ function demo() {
         { name: '陕西', value: 117 }, { name: '重庆', value: 111 },
         { name: '天津', value: 109 }, { name: '上海', value: 107 }
       ]
+    },
+    popStats: {
+      student: { total: 20614, todayNew: 181 },
+      school:  { total: 6155,  todayNew: 13 },
+      dean:    { total: 2182,  todayNew: 1 },
+      teacher: { total: 16898, todayNew: 3 }
     }
   };
 }

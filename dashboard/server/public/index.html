@@ -181,6 +181,25 @@
   .mini-stats .bar{height:6px;border-radius:4px;background:rgba(80,150,230,.14);overflow:hidden;margin-top:-4px}
   .mini-stats .bar i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#1d6dff,#38e8ff)}
 
+  .pop-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;height:100%;align-content:center}
+  .pop-card{background:linear-gradient(135deg,rgba(29,109,255,.12),rgba(56,216,255,.06));
+    border:1px solid rgba(56,216,255,.2);border-radius:4px;padding:12px 14px 10px;position:relative;overflow:hidden}
+  .pop-card::before{content:"";position:absolute;right:-18px;top:-18px;width:52px;height:52px;border-radius:50%;
+    background:radial-gradient(circle,rgba(56,216,255,.28),transparent 65%);pointer-events:none}
+  .pop-card .lb{font-size:11px;color:#7fb6db;letter-spacing:.08em}
+  .pop-card .val{font-family:"DIN Alternate",Consolas,monospace;font-size:26px;color:#f0fbff;font-weight:700;
+    text-shadow:0 0 14px rgba(56,216,255,.35);line-height:1;margin-top:4px;letter-spacing:-.5px}
+  .pop-card .tag{display:inline-flex;align-items:center;gap:4px;margin-top:8px;padding:2px 8px;border-radius:10px;
+    font-size:11px;color:#86efac;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35)}
+  .pop-card .tag b{font-family:"DIN Alternate",Consolas,monospace;color:#86efac;font-weight:700}
+  .pop-card .bar{height:4px;border-radius:2px;background:rgba(80,150,230,.18);overflow:hidden;margin-top:10px}
+  .pop-card .bar i{display:block;height:100%;width:0;border-radius:2px;background:linear-gradient(90deg,#1d6dff,#38e8ff);
+    box-shadow:0 0 6px rgba(56,216,255,.55)}
+  .pop-card.alt{background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(168,85,247,.05));border-color:rgba(168,85,247,.25)}
+  .pop-card.alt::before{background:radial-gradient(circle,rgba(168,85,247,.28),transparent 65%)}
+  .pop-card.amber{background:linear-gradient(135deg,rgba(251,146,60,.1),rgba(251,191,36,.05));border-color:rgba(251,191,36,.25)}
+  .pop-card.rose{background:linear-gradient(135deg,rgba(244,63,94,.1),rgba(236,72,153,.05));border-color:rgba(236,72,153,.25)}
+
   /* ---------- right ---------- */
   .donut-wrap{display:flex;height:100%;align-items:center;gap:6px}
   .donut-wrap .cv{width:52%;height:100%;position:relative}
@@ -313,8 +332,8 @@
             </div>
           </div>
           <div class="panel">
-            <div class="ptitle"><h3>今日订单渠道占比</h3><span class="sub">TODAY ORDERS</span></div>
-            <div class="body"><canvas id="cRegion"></canvas></div>
+            <div class="ptitle"><h3>今日新增 / 存量</h3><span class="sub">POPULATION</span></div>
+            <div class="body"><div class="pop-grid" id="popGrid"></div></div>
           </div>
         </div>
       </section>
@@ -725,49 +744,41 @@
     }
   });
 
-  /* ---------- 区域在线 ---------- */
-  renderers.push(function (p, now) {
-    var r = prep($('cRegion'));
-    if (!r) return;
-    var data = DATA.region || [];
-    if (!data.length) return;
-    var ctx = r.ctx, w = r.w, h = r.h;
-    var left = 46, right = 38, top = 6;
-    var rowH = (h - top * 2) / data.length;
-    ctx.font = '12px "PingFang SC", "Microsoft YaHei", sans-serif';
-    ctx.textBaseline = 'middle';
-    data.forEach(function (d, i) {
-      var y = top + rowH * i + rowH / 2;
-      ctx.fillStyle = 'rgba(140,180,215,.9)';
-      ctx.textAlign = 'right';
-      ctx.fillText(d.name, left - 10, y);
-      var tw = w - left - right;
-      ctx.fillStyle = 'rgba(80,150,230,.12)';
-      roundRect(ctx, left, y - 5, tw, 10, 5);
-      ctx.fill();
-      var bw = tw * (Math.min(d.value, 100) / 100) * p;
-      var gd = ctx.createLinearGradient(left, 0, left + tw, 0);
-      gd.addColorStop(0, 'rgba(29,109,255,.75)');
-      gd.addColorStop(1, '#38e8ff');
-      ctx.fillStyle = gd;
-      ctx.shadowColor = 'rgba(56,232,255,.55)';
-      ctx.shadowBlur = 10;
-      roundRect(ctx, left, y - 5, Math.max(bw, 6), 10, 5);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      if (p >= 1 && bw > 20) {
-        var hx = left + ((now / 12 + i * 90) % (bw - 14));
-        var hg = ctx.createLinearGradient(hx, 0, hx + 14, 0);
-        hg.addColorStop(0, 'rgba(255,255,255,0)');
-        hg.addColorStop(.5, 'rgba(255,255,255,.55)');
-        hg.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = hg;
-        ctx.fillRect(hx, y - 5, 14, 10);
-      }
-      ctx.fillStyle = '#d9efff';
-      ctx.textAlign = 'left';
-      ctx.fillText(Math.round(d.value) + '%', left + tw + 8, y);
-    });
+  /* ---------- 4 张人口统计卡 ---------- */
+  renderers.push(function () {
+    var box = document.getElementById('popGrid');
+    if (!box) return;
+    if (box._rendered) {
+      // 只在数据第一次到来时渲染 DOM，之后只更新数字
+      var d = DATA.popStats || {};
+      if (d.student) box.querySelectorAll('.pop-card')[0].querySelector('.val').textContent = d.student.total.toLocaleString('en-US');
+      if (d.student) box.querySelectorAll('.pop-card')[0].querySelector('.tag b').textContent = '+' + d.student.todayNew;
+      if (d.school)  box.querySelectorAll('.pop-card')[1].querySelector('.val').textContent = d.school.total.toLocaleString('en-US');
+      if (d.school)  box.querySelectorAll('.pop-card')[1].querySelector('.tag b').textContent = '+' + d.school.todayNew;
+      if (d.dean)    box.querySelectorAll('.pop-card')[2].querySelector('.val').textContent = d.dean.total.toLocaleString('en-US');
+      if (d.dean)    box.querySelectorAll('.pop-card')[2].querySelector('.tag b').textContent = '+' + d.dean.todayNew;
+      if (d.teacher) box.querySelectorAll('.pop-card')[3].querySelector('.val').textContent = d.teacher.total.toLocaleString('en-US');
+      if (d.teacher) box.querySelectorAll('.pop-card')[3].querySelector('.tag b').textContent = '+' + d.teacher.todayNew;
+      return;
+    }
+    var d = DATA.popStats || {};
+    if (!d.student) return;
+    var cards = [
+      { lb: '学生总数', v: d.student.total, n: d.student.todayNew, cls: '' },
+      { lb: '校区个数', v: d.school.total,  n: d.school.todayNew,  cls: 'alt' },
+      { lb: '教务人数', v: d.dean.total,    n: d.dean.todayNew,    cls: 'amber' },
+      { lb: '教练人数', v: d.teacher.total, n: d.teacher.todayNew, cls: 'rose' }
+    ];
+    box.innerHTML = cards.map(function (c) {
+      var ratio = c.v ? Math.min(c.n / c.v * 100, 100) : 0;
+      return '<div class="pop-card ' + c.cls + '">' +
+        '<div class="lb">' + c.lb + '</div>' +
+        '<div class="val">' + c.v.toLocaleString('en-US') + '</div>' +
+        '<div class="tag"><span>今日新增</span><b>+' + c.n + '</b></div>' +
+        '<div class="bar"><i style="width:' + ratio + '%"></i></div>' +
+      '</div>';
+    }).join('');
+    box._rendered = true;
   });
 
   /* ---------- 资源负载环 ---------- */

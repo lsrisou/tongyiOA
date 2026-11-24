@@ -552,6 +552,39 @@ async function loadSchoolMap(connection) {
   return { total: rows.length, unknown: unknown, provinces: provinces };
 }
 
+/** 中下2：4 张人口统计卡（学生/校区/教务/教练，总数 + 今日新增） */
+async function loadPopStats(connection) {
+  // 学生：有过课时记录的 distinct student_id
+  const [st] = await connection.query(
+    "SELECT COUNT(DISTINCT student_id) total, " +
+    "COUNT(DISTINCT CASE WHEN created_at >= CURDATE() AND deleted_at IS NULL THEN student_id END) today_new " +
+    "FROM de_student_hour_lessons " +
+    "WHERE student_id > 0 AND deleted_at IS NULL"
+  );
+  // 校区：company_id=0 直营
+  const [sc] = await connection.query(
+    "SELECT COUNT(*) total, " +
+    "SUM(created_at >= CURDATE() AND deleted_at IS NULL) today_new " +
+    "FROM de_schools WHERE deleted_at IS NULL AND company_id = 0"
+  );
+  // 教务 / 教练（教练 role_id = school_teacher，不包含预备教练 school_pre_teacher）
+  const [roles] = await connection.query(
+    "SELECT role_id, COUNT(*) total, " +
+    "SUM(created_at >= CURDATE() AND deleted_at IS NULL) today_new " +
+    "FROM de_admin_users WHERE deleted_at IS NULL " +
+    "AND role_id IN ('school_teacher','school_dean') " +
+    "GROUP BY role_id"
+  );
+  const roleMap = {};
+  roles.forEach(function (r) { roleMap[r.role_id] = r; });
+  return {
+    student: { total: Number(st[0].total) || 0, todayNew: Number(st[0].today_new) || 0 },
+    school:  { total: Number(sc[0].total) || 0, todayNew: Number(sc[0].today_new) || 0 },
+    dean:    { total: Number((roleMap.school_dean || {}).total) || 0, todayNew: Number((roleMap.school_dean || {}).today_new) || 0 },
+    teacher: { total: Number((roleMap.school_teacher || {}).total) || 0, todayNew: Number((roleMap.school_teacher || {}).today_new) || 0 }
+  };
+}
+
 async function loadMetrics() {
   if (!DB.host) return demo();
 
@@ -613,6 +646,11 @@ async function loadMetrics() {
       data.schoolMap = await loadSchoolMap(db);
     } catch (mapErr) {
       console.error('[db] school-map query failed:', mapErr.message);
+    }
+    try {
+      data.popStats = await loadPopStats(db);
+    } catch (psErr) {
+      console.error('[db] pop-stats query failed:', psErr.message);
     }
     data.source = 'db';
     data.updatedAt = new Date().toISOString();

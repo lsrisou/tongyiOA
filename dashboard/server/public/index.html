@@ -128,6 +128,12 @@
   .rank.plain .track{display:none}
   .rank.plain .name{width:auto;flex:1}
   .rank.plain .num{width:70px}
+  .rank.dense{gap:1px}
+  .rank.dense .row{gap:6px}
+  .rank.dense .no{width:15px;height:15px;font-size:9px;border-radius:2px}
+  .rank.dense .name{width:60px;font-size:11px}
+  .rank.dense .track{height:6px}
+  .rank.dense .num{width:44px;font-size:11px}
 
   .rings{display:grid;grid-template-columns:repeat(3,1fr);height:100%;align-items:center}
   .ring{display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -302,8 +308,8 @@
           <div class="body"><div class="events" id="eventList"></div></div>
         </div>
         <div class="panel">
-          <div class="ptitle"><h3>教练课时 TOP 6</h3><span class="sub">TODAY HOT</span></div>
-          <div class="body"><div class="rank" id="teacherRankList"></div></div>
+          <div class="ptitle"><h3>教练课时 TOP 10</h3><span class="sub">TODAY HOT</span></div>
+          <div class="body"><div class="rank dense" id="teacherRankList"></div></div>
         </div>
       </section>
     </main>
@@ -432,7 +438,9 @@
     teacherRank: [
       { name: '张兴伟', value: 3.0 }, { name: '孟夏', value: 3.0 },
       { name: '彦楠', value: 3.0 }, { name: '陆金莲', value: 3.0 },
-      { name: '张老师', value: 3.0 }, { name: '陈菡', value: 3.0 }
+      { name: '张老师', value: 3.0 }, { name: '陈菡', value: 3.0 },
+      { name: '李静', value: 2.5 }, { name: '王芳', value: 2.5 },
+      { name: '赵磊', value: 2.0 }, { name: '刘洋', value: 2.0 }
     ],
     load: [{ name: 'CPU', value: 62 }, { name: '内存', value: 78 }, { name: '带宽', value: 45 }],
     channel: [

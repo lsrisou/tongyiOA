@@ -60,7 +60,9 @@ function demo() {
     teacherRank: [
       { name: '张兴伟', value: 3.0 }, { name: '孟夏', value: 3.0 },
       { name: '彦楠', value: 3.0 }, { name: '陆金莲', value: 3.0 },
-      { name: '张老师', value: 3.0 }, { name: '陈菡', value: 3.0 }
+      { name: '张老师', value: 3.0 }, { name: '陈菡', value: 3.0 },
+      { name: '李静', value: 2.5 }, { name: '王芳', value: 2.5 },
+      { name: '赵磊', value: 2.0 }, { name: '刘洋', value: 2.0 }
     ],
     load: [
       { name: '教练利用率', value: 11 },

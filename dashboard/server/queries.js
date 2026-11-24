@@ -341,7 +341,7 @@ async function loadSchoolRank(connection) {
   });
 }
 
-/** 右3：今日教练课时 TOP 6 */
+/** 右3：今日教练课时 TOP 10 */
 async function loadTeacherRank(connection) {
   const [rows] = await connection.query(
     'SELECT u.name AS name, ROUND(SUM(l.hour_count), 1) AS h ' +
@@ -351,7 +351,7 @@ async function loadTeacherRank(connection) {
     'AND l.start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) ' +
     'AND l.deleted_at IS NULL ' +
     'GROUP BY l.teacher_id ' +
-    'ORDER BY h DESC LIMIT 6'
+    'ORDER BY h DESC LIMIT 10'
   );
   return rows.map(function (r) {
     return { name: r.name || '未知', value: Number(r.h) || 0 };

@@ -101,6 +101,8 @@
   .kpi .val{font-family:"DIN Alternate","Bahnschrift",Consolas,monospace;font-size:28px;font-weight:700;letter-spacing:.02em;
     color:#f0fbff;text-shadow:0 0 20px rgba(56,189,248,.45);line-height:1.25}
   .kpi .val small{font-size:15px;color:#7dd3fc;margin-left:3px;letter-spacing:.04em}
+  .kpi .val.fraction small{font-size:18px;color:#4ade80;margin:0 5px;text-shadow:0 0 14px rgba(74,222,128,.45)}
+  .kpi .val.fraction #kpiConvDen{color:#94a3b8;text-shadow:0 0 10px rgba(148,163,184,.25)}
   .kpi .delta{font-size:11px;letter-spacing:.03em;color:#7fa6c9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .kpi .delta .yest{color:#4ade80}
   .kpi .delta .mom.up{color:#4ade80}
@@ -233,8 +235,8 @@
           </div>
           <div class="kpi">
             <div class="label">今日学生转化率</div>
-            <div class="val"><span id="kpiConversionRate">0</span><small>%</small></div>
-            <div class="delta" id="deltaConversionRate">已转正 / 今日体验课</div>
+            <div class="val fraction"><span id="kpiConvNum">0</span><small>/</small><span id="kpiConvDen">0</span></div>
+            <div class="delta" id="deltaConversionRate">已转正 / 今日完课</div>
           </div>
           <div class="kpi">
             <div class="label">今日校区充值金额</div>
@@ -441,7 +443,6 @@
   var kpiDefs = [
     { key: 'trialHours', el: 'kpiTrialHours', dec: 1, deltaEl: 'deltaTrialHours', unit: ' 课时' },
     { key: 'regularHours', el: 'kpiRegularHours', dec: 1, deltaEl: 'deltaRegularHours', unit: ' 课时' },
-    { key: 'conversionRate', el: 'kpiConversionRate', dec: 1, deltaEl: 'deltaConversionRate', unit: '%', isRate: true },
     { key: 'schoolChargeAmount', el: 'kpiSchoolChargeAmount', dec: 2, deltaEl: 'deltaSchoolChargeAmount', unit: ' 元' },
     { key: 'trialPayAmount', el: 'kpiTrialPayAmount', dec: 2, deltaEl: 'deltaTrialPayAmount', unit: ' 元' }
   ];
@@ -480,31 +481,41 @@
       var y = DATA.yesterday || {};
       var yv = y[d.key];
       var diff = null;
-      if (yv != null) {
-        if (d.isRate) {
-          diff = target - yv;
-        } else if (Number(yv) !== 0) {
-          diff = (target - yv) / Number(yv) * 100;
-        }
+      if (yv != null && Number(yv) !== 0) {
+        diff = (target - yv) / Number(yv) * 100;
       }
       if (yv == null) {
         del.innerHTML = '<span class="yest">昨日 --</span>';
       } else {
         var momClass = diff == null || diff === 0 ? 'flat' : (diff > 0 ? 'up' : 'down');
-        var momText = diff == null ? '—' : (diff >= 0 ? '+' : '') +
-          diff.toFixed(1) + (d.isRate ? 'pp' : '%');
-        var yestText = d.isRate
-          ? '昨日 ' + formatNum(yv, 1) + '%'
-          : '昨日 ' + formatNum(yv, d.dec) + (d.unit || '');
-        var todayText = '';
-        if (d.isRate) {
-          var detail = DATA.kpis.conversionDetail || { converted: 0, total: 0 };
-          todayText = '<span class="today"> · 今日 ' + detail.converted + '/' + detail.total + '</span>';
-        }
-        del.innerHTML = '<span class="yest">' + yestText + '</span>' +
-          '<span class="mom ' + momClass + '"> · 环比 ' + momText + '</span>' + todayText;
+        var momText = diff == null ? '—' : (diff >= 0 ? '+' : '') + diff.toFixed(1) + '%';
+        del.innerHTML = '<span class="yest">昨日 ' + formatNum(yv, d.dec) + (d.unit || '') + '</span>' +
+          '<span class="mom ' + momClass + '"> · 环比 ' + momText + '</span>';
       }
     });
+
+    // 独立处理：学生转化率卡片显示分数（converted / total）
+    var cd = DATA.kpis.conversionDetail || { converted: 0, total: 0 };
+    var ycd = (DATA.yesterday || {}).conversionDetail || null;
+    tweenNumber($('kpiConvNum'), Number(cd.converted || 0), Number(cd.converted || 0), 0, first ? 500 : 400);
+    tweenNumber($('kpiConvDen'), Number(cd.total || 0), Number(cd.total || 0), 0, first ? 500 : 400);
+    if (first) {
+      setTimeout(function () {
+        $('kpiConvNum').textContent = Number(cd.converted || 0);
+        $('kpiConvDen').textContent = Number(cd.total || 0);
+      }, 600);
+    }
+    var yDet = $('deltaConversionRate');
+    if (ycd && (ycd.converted || ycd.total)) {
+      var convDiff = null;
+      if (Number(ycd.converted) !== 0) convDiff = (cd.converted - ycd.converted) / Number(ycd.converted) * 100;
+      var momClass2 = convDiff == null || convDiff === 0 ? 'flat' : (convDiff > 0 ? 'up' : 'down');
+      var momText2 = convDiff == null ? '—' : (convDiff >= 0 ? '+' : '') + convDiff.toFixed(1) + '%';
+      yDet.innerHTML = '<span class="yest">昨日 ' + Number(ycd.converted) + '/' + Number(ycd.total) + '</span>' +
+        '<span class="mom ' + momClass2 + '"> · 环比 ' + momText2 + '</span>';
+    } else {
+      yDet.innerHTML = '<span class="yest">昨日 --</span>';
+    }
   }
   updateKpis(true);
 

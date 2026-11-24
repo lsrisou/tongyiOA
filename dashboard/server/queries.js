@@ -311,6 +311,7 @@ async function loadLevelHours(connection) {
     "WHERE l.start_time >= UNIX_TIMESTAMP(CURDATE()) " +
     "AND l.start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) " +
     "AND l.deleted_at IS NULL " +
+    "AND u.deleted_at IS NULL " +
     "GROUP BY u.teach_level " +
     "ORDER BY h DESC"
   );
@@ -350,7 +351,7 @@ async function loadTeacherRank(connection) {
     'JOIN de_admin_users u ON u.id = l.teacher_id ' +
     'WHERE l.start_time >= UNIX_TIMESTAMP(CURDATE()) ' +
     'AND l.start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) ' +
-    'AND l.deleted_at IS NULL ' +
+    'AND l.deleted_at IS NULL AND u.deleted_at IS NULL ' +
     'GROUP BY l.teacher_id ' +
     'ORDER BY h DESC LIMIT 20'
   );

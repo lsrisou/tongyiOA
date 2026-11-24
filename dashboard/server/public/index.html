@@ -107,7 +107,7 @@
   .map-rank .nm{width:38px;flex:none;font-size:11px;color:#a9c9e4;white-space:nowrap}
   .map-rank .tr{flex:1;min-width:0;height:6px;border-radius:3px;background:rgba(80,150,230,.14);overflow:hidden}
   .map-rank .fi{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#1d6dff,#38e8ff);box-shadow:0 0 8px rgba(56,232,255,.5)}
-  .map-rank .vv{width:34px;flex:none;text-align:right;font-family:"DIN Alternate",Consolas,monospace;font-size:11px;color:#dff1ff}
+  .map-rank .vv{width:44px;flex:none;text-align:right;font-family:"DIN Alternate",Consolas,monospace;font-size:11px;color:#dff1ff}
   .map-stat{position:absolute;left:16px;bottom:12px;display:flex;gap:18px;z-index:2;
     font-size:11px;letter-spacing:.06em;color:#7fa6c9;pointer-events:none}
   .map-stat b{font-family:"DIN Alternate",Consolas,monospace;font-size:16px;color:#e6f7ff;margin-right:4px;font-weight:600}
@@ -1131,7 +1131,7 @@
         return '<div class="row"><i class="no">' + (i + 1) + '</i>' +
           '<span class="nm">' + d.name + '</span>' +
           '<span class="tr"><span class="fi" style="width:' + w + '%"></span></span>' +
-          '<b class="vv">' + Number(d.value).toLocaleString('en-US') + '</b></div>';
+          '<b class="vv">' + Number(d.value).toLocaleString('en-US') + '个</b></div>';
       }).join('');
     }
   }

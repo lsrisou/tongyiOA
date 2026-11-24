@@ -67,7 +67,12 @@ function demo() {
       { name: '彦楠', value: 3.0 }, { name: '陆金莲', value: 3.0 },
       { name: '张老师', value: 3.0 }, { name: '陈菡', value: 3.0 },
       { name: '李静', value: 2.5 }, { name: '王芳', value: 2.5 },
-      { name: '赵磊', value: 2.0 }, { name: '刘洋', value: 2.0 }
+      { name: '赵磊', value: 2.0 }, { name: '刘洋', value: 2.0 },
+      { name: '孙悦', value: 2.0 }, { name: '周敏', value: 1.5 },
+      { name: '吴强', value: 1.5 }, { name: '郑洁', value: 1.5 },
+      { name: '冯凯', value: 1.0 }, { name: '朱琳', value: 1.0 },
+      { name: '何鹏', value: 1.0 }, { name: '许晴', value: 0.5 },
+      { name: '马超', value: 0.5 }, { name: '林雪', value: 0.5 }
     ],
     load: [
       { name: '教练利用率', value: 11 },

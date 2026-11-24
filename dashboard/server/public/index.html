@@ -172,12 +172,11 @@
   .ev .m .tail .sch{color:#9bbfe0}
   .ev .m .act{color:#a9c9e4}
   .ev .m .diff{color:#fbbf24;margin-left:4px;text-shadow:0 0 8px rgba(251,191,36,.35)}
+  .ev .m .dup{display:inline-block;margin-left:24px}
   .ev .m.marquee{animation:evMarquee var(--m-dur,12s) linear infinite;animation-delay:var(--m-delay,0s)}
   @keyframes evMarquee{
     0%{transform:translateX(0)}
-    1%{transform:translateX(0)}
-    98%{transform:translateX(var(--m-distance,0px))}
-    100%{transform:translateX(var(--m-distance,0px))}
+    100%{transform:translateX(calc(-50% - 12px))}
   }
   @keyframes evIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
 
@@ -993,17 +992,18 @@
         if (e.target) tail += '<span class="tgt">对 ' + escHtml(e.target) + '</span>';
         if (e.school) tail += '<span class="sch">@ ' + escHtml(e.school) + '</span>';
         var actionText = escHtml(e.action || '操作') + (e.courseId ? ' · 课程#' + escHtml(String(e.courseId)) : '') + (e.diff ? ' <span class="diff">' + escHtml(e.diff) + '</span>' : '');
+        var contentHTML =
+          '<em class="who">' + name + '</em>' +
+          (role ? '<span class="role">' + role + '</span>' : '') +
+          (tail ? '<span class="tail">' + tail + '</span>' : '') +
+          '<span class="act">' + actionText + '</span>';
         var el = document.createElement('div');
         el.className = 'ev';
         el.innerHTML =
           '<span class="t">' + escHtml(e.time || '') + '</span>' +
           '<span class="d" style="background:' + color + ';color:' + color + '"></span>' +
-          '<span class="m">' +
-            '<em class="who">' + name + '</em>' +
-            (role ? '<span class="role">' + role + '</span>' : '') +
-            (tail ? '<span class="tail">' + tail + '</span>' : '') +
-            '<span class="act">' + actionText + '</span>' +
-          '</span>';
+          '<span class="m">' + contentHTML + '</span>';
+        el._contentHTML = contentHTML; // 供跑马灯复制用
         track.appendChild(el);
       });
     }
@@ -1013,22 +1013,32 @@
   }
 
   function applyMarquee() {
-    var items = document.querySelectorAll('#eventList .ev .m');
-    items.forEach(function (el, idx) {
-      var overflow = el.scrollWidth - el.clientWidth;
-      // 先清掉旧的 marquee 状态（数据刷新或窗口 resize 后）
-      el.classList.remove('marquee');
+    var items = document.querySelectorAll('#eventList .ev');
+    items.forEach(function (ev, idx) {
+      var m = ev.querySelector('.m');
+      if (!m) return;
+      // 清掉旧状态，去掉 .dup 副本
+      m.classList.remove('marquee');
+      var dup = m.querySelector('.dup');
+      if (dup) dup.remove();
+
+      var overflow = m.scrollWidth - m.clientWidth;
       if (overflow > 4) {
-        var dur = Math.max(6, Math.min(22, overflow / 14)); // 约 14px/s，6~22s
-        var delay = (idx % 6) * 0.4; // 错开启动，避免整体同步
-        el.style.setProperty('--m-distance', '-' + overflow + 'px');
-        el.style.setProperty('--m-dur', dur + 's');
-        el.style.setProperty('--m-delay', delay + 's');
-        el.classList.add('marquee');
+        // 复制一份内容 .dup，关键帧滚 -50% 就能完整滚一遍
+        var html = ev._contentHTML || m.innerHTML;
+        dup = document.createElement('span');
+        dup.className = 'dup';
+        dup.innerHTML = html;
+        m.appendChild(dup);
+        // 滚完 -50% = 一份内容的宽度；按 14px/s 估算，最短 6s 最长 22s
+        var dur = Math.max(6, Math.min(22, m.scrollWidth / 28));
+        var delay = (idx % 8) * 0.3;
+        m.style.setProperty('--m-dur', dur + 's');
+        m.style.setProperty('--m-delay', delay + 's');
+        m.classList.add('marquee');
       } else {
-        el.style.removeProperty('--m-distance');
-        el.style.removeProperty('--m-dur');
-        el.style.removeProperty('--m-delay');
+        m.style.removeProperty('--m-dur');
+        m.style.removeProperty('--m-delay');
       }
     });
   }

@@ -533,6 +533,7 @@ async function loadSchoolMap(connection) {
     'JOIN de_schools s ON s.id = u.school_id ' +
     "WHERE u.role_id = 'school_headmaster' AND u.school_id <> 0 " +
     'AND u.deleted_at IS NULL AND s.deleted_at IS NULL ' +
+    'AND s.company_id = 0 ' +
     'GROUP BY u.school_id'
   );
   const counts = {};

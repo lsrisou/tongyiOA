@@ -848,7 +848,7 @@
         '<span class="name" title="' + d.name + (d.dean ? ' · ' + d.dean : '') + '">' + d.name +
         (d.dean ? '<i class="dept">' + d.dean + '</i>' : '') + '</span>' +
         '<span class="track"><span class="fill"></span></span>' +
-        '<span class="num">' + Number(d.value || 0).toLocaleString('en-US') + 'h</span>';
+        '<span class="num">' + Number(d.value || 0).toLocaleString('en-US') + ' h</span>';
       wrap.appendChild(row);
     });
     setTimeout(function () {
@@ -1133,7 +1133,7 @@
         return '<div class="row"><i class="no">' + (i + 1) + '</i>' +
           '<span class="nm">' + d.name + '</span>' +
           '<span class="tr"><span class="fi" style="width:' + w + '%"></span></span>' +
-          '<b class="vv">' + Number(d.value).toLocaleString('en-US') + '个</b></div>';
+          '<b class="vv">' + Number(d.value).toLocaleString('en-US') + ' 个</b></div>';
       }).join('');
     }
   }

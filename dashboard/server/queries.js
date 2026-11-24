@@ -235,6 +235,16 @@ async function loadEvents(connection) {
     var extra = [];
     if (row.target_name) extra.push('对 ' + row.target_name);
     if (row.school_name) extra.push('@ ' + row.school_name);
+    // 特殊：修改教练级别 显示 old_level → new_level
+    var diff = '';
+    if (row.action === '修改教练级别' && row.content) {
+      try {
+        var c = JSON.parse(row.content);
+        var oldTl = TEACH_LEVELS[Number(c.old_level)];
+        var newTl = TEACH_LEVELS[Number(c.new_level)];
+        if (oldTl && newTl && oldTl !== newTl) diff = oldTl + ' → ' + newTl;
+      } catch (e) { /* ignore */ }
+    }
     return {
       time: row.time_text,
       action: row.action,
@@ -244,7 +254,8 @@ async function loadEvents(connection) {
       school: row.school_name || '',
       tail: extra.join(' '),
       role: resolveRole(row.op_role_id, row.op_teach_level),
-      courseId: parseCourseId(row.content)
+      courseId: parseCourseId(row.content),
+      diff: diff
     };
   });
 }

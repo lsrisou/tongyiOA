@@ -171,6 +171,7 @@
   .ev .m .tail .tgt{color:#8ab4d8}
   .ev .m .tail .sch{color:#9bbfe0}
   .ev .m .act{color:#a9c9e4}
+  .ev .m .diff{color:#fbbf24;margin-left:4px;text-shadow:0 0 8px rgba(251,191,36,.35)}
   @keyframes evIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
 
   .ai-list{display:flex;flex-direction:column;justify-content:space-around;height:100%}
@@ -971,7 +972,7 @@
     }
     if (feedTimer) { clearInterval(feedTimer); feedTimer = null; }
     var key = list.map(function (e) {
-      return [e.time, e.action, e.operator, e.courseId].join(':');
+      return [e.time, e.action, e.operator, e.courseId, e.diff].join(':');
     }).join('|');
     if (key === lastEventKey) return;
     lastEventKey = key;
@@ -991,7 +992,7 @@
         var tail = '';
         if (e.target) tail += '<span class="tgt">对 ' + escHtml(e.target) + '</span>';
         if (e.school) tail += '<span class="sch">@ ' + escHtml(e.school) + '</span>';
-        var actionText = escHtml(e.action || '操作') + (e.courseId ? ' · 课程#' + escHtml(String(e.courseId)) : '');
+        var actionText = escHtml(e.action || '操作') + (e.courseId ? ' · 课程#' + escHtml(String(e.courseId)) : '') + (e.diff ? ' <span class="diff">' + escHtml(e.diff) + '</span>' : '');
         var el = document.createElement('div');
         el.className = 'ev';
         el.innerHTML =

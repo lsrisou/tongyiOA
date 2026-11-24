@@ -55,7 +55,12 @@ function demo() {
       { name: '经开校区', value: 6.5 }, { name: '雁塔校区', value: 5.0 },
       { name: '碑林校区', value: 4.5 }, { name: '长安校区', value: 3.5 },
       { name: '未央校区', value: 3.0 }, { name: '莲湖校区', value: 2.5 },
-      { name: '新城校区', value: 2.0 }, { name: '灞桥校区', value: 1.5 }
+      { name: '新城校区', value: 2.0 }, { name: '灞桥校区', value: 1.5 },
+      { name: '临潼校区', value: 1.5 }, { name: '阎良校区', value: 1.2 },
+      { name: '户县校区', value: 1.0 }, { name: '周至校区', value: 1.0 },
+      { name: '蓝田校区', value: 0.8 }, { name: '高陵校区', value: 0.8 },
+      { name: '咸阳秦都校区', value: 0.6 }, { name: '咸阳渭城校区', value: 0.6 },
+      { name: '渭南临渭校区', value: 0.5 }, { name: '宝鸡渭滨校区', value: 0.4 }
     ],
     teacherRank: [
       { name: '张兴伟', value: 3.0 }, { name: '孟夏', value: 3.0 },

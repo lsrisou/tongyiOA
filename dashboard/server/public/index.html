@@ -127,7 +127,10 @@
   .rank .num{width:52px;text-align:right;flex:none;font-family:"DIN Alternate",Consolas,monospace;font-size:13px;color:#d9efff}
   .rank.plain .track{display:none}
   .rank.plain .name{width:auto;flex:1}
-  .rank.plain .num{width:70px}
+  .rank.plain .num{width:60px}
+  .rank.two-col{display:grid;grid-template-rows:repeat(10,1fr);grid-auto-flow:column;
+    grid-auto-columns:1fr;gap:2px 18px;justify-content:initial}
+  .rank.two-col .row{gap:6px;min-height:0}
   .rank.dense{gap:1px}
   .rank.dense .row{gap:6px}
   .rank.dense .no{width:15px;height:15px;font-size:9px;border-radius:2px}
@@ -225,7 +228,7 @@
         <div class="panel">
           <div class="ptitle"><h3>今日校区课时排行</h3><span class="sub">TODAY CAMPUS</span></div>
           <div class="body">
-            <div class="rank plain" id="rankList"></div>
+            <div class="rank plain two-col" id="rankList"></div>
           </div>
         </div>
         <div class="panel">
@@ -433,7 +436,12 @@
       { name: '经开校区', value: 6.5 }, { name: '雁塔校区', value: 5.0 },
       { name: '碑林校区', value: 4.5 }, { name: '长安校区', value: 3.5 },
       { name: '未央校区', value: 3.0 }, { name: '莲湖校区', value: 2.5 },
-      { name: '新城校区', value: 2.0 }, { name: '灞桥校区', value: 1.5 }
+      { name: '新城校区', value: 2.0 }, { name: '灞桥校区', value: 1.5 },
+      { name: '临潼校区', value: 1.5 }, { name: '阎良校区', value: 1.2 },
+      { name: '户县校区', value: 1.0 }, { name: '周至校区', value: 1.0 },
+      { name: '蓝田校区', value: 0.8 }, { name: '高陵校区', value: 0.8 },
+      { name: '咸阳秦都校区', value: 0.6 }, { name: '咸阳渭城校区', value: 0.6 },
+      { name: '渭南临渭校区', value: 0.5 }, { name: '宝鸡渭滨校区', value: 0.4 }
     ],
     teacherRank: [
       { name: '张兴伟', value: 3.0 }, { name: '孟夏', value: 3.0 },

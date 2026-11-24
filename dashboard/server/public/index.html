@@ -94,6 +94,20 @@
   .ptitle .sub.lg i.a{background:#38e8ff;box-shadow:0 0 8px #38e8ff}
   .ptitle .sub.lg i.b{background:#fbbf24;box-shadow:0 0 8px #fbbf24;margin-left:8px}
   #mapChart{width:100%;height:100%}
+  .map-wrap{display:flex;gap:12px;height:100%;min-height:0}
+  .map-wrap #mapChart{flex:1;min-width:0;width:auto}
+  .map-rank{width:200px;flex:none;display:flex;flex-direction:column;justify-content:center;gap:5px;min-height:0}
+  .map-rank .ttl{font-size:10px;letter-spacing:.1em;color:#527ea8;margin-bottom:2px}
+  .map-rank .row{display:flex;align-items:center;gap:7px;height:22px;flex:none}
+  .map-rank .no{width:16px;height:16px;flex:none;border-radius:3px;font-size:10px;display:flex;align-items:center;justify-content:center;
+    background:rgba(56,189,248,.12);color:#7dd3fc;border:1px solid rgba(56,189,248,.28)}
+  .map-rank .row:nth-child(2) .no{background:rgba(251,191,36,.16);color:#fbbf24;border-color:rgba(251,191,36,.45)}
+  .map-rank .row:nth-child(3) .no{background:rgba(203,213,225,.14);color:#cbd5e1;border-color:rgba(203,213,225,.4)}
+  .map-rank .row:nth-child(4) .no{background:rgba(251,146,60,.14);color:#fb923c;border-color:rgba(251,146,60,.4)}
+  .map-rank .nm{width:38px;flex:none;font-size:11px;color:#a9c9e4;white-space:nowrap}
+  .map-rank .tr{flex:1;min-width:0;height:6px;border-radius:3px;background:rgba(80,150,230,.14);overflow:hidden}
+  .map-rank .fi{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#1d6dff,#38e8ff);box-shadow:0 0 8px rgba(56,232,255,.5)}
+  .map-rank .vv{width:34px;flex:none;text-align:right;font-family:"DIN Alternate",Consolas,monospace;font-size:11px;color:#dff1ff}
   .map-stat{position:absolute;left:16px;bottom:12px;display:flex;gap:18px;z-index:2;
     font-size:11px;letter-spacing:.06em;color:#7fa6c9;pointer-events:none}
   .map-stat b{font-family:"DIN Alternate",Consolas,monospace;font-size:16px;color:#e6f7ff;margin-right:4px;font-weight:600}
@@ -282,7 +296,10 @@
         <div class="panel hero-chart">
           <div class="ptitle"><h3>全国校区分布</h3><span class="sub">CAMPUS MAP · 校长手机号归属地</span></div>
           <div class="body">
-            <div id="mapChart"></div>
+            <div class="map-wrap">
+              <div id="mapChart"></div>
+              <aside class="map-rank" id="mapRank"></aside>
+            </div>
             <div class="map-stat" id="mapStat"></div>
           </div>
         </div>
@@ -1103,6 +1120,19 @@
         '<span><b>' + Number(sm.total || 0).toLocaleString('en-US') + '</b>校区总数</span>' +
         '<span><b>' + list.length + '</b>覆盖省份</span>' +
         '<span><b>' + Number(sm.unknown || 0).toLocaleString('en-US') + '</b>归属未知</span>';
+    }
+
+    var rk = $('mapRank');
+    if (rk) {
+      var top = list.slice(0, 10);
+      var mx = top.length ? (top[0].value || 1) : 1;
+      rk.innerHTML = '<div class="ttl">省份排行 TOP 10</div>' + top.map(function (d, i) {
+        var w = Math.max(6, Math.round((d.value / mx) * 100));
+        return '<div class="row"><i class="no">' + (i + 1) + '</i>' +
+          '<span class="nm">' + d.name + '</span>' +
+          '<span class="tr"><span class="fi" style="width:' + w + '%"></span></span>' +
+          '<b class="vv">' + Number(d.value).toLocaleString('en-US') + '</b></div>';
+      }).join('');
     }
   }
 

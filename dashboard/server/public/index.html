@@ -125,6 +125,9 @@
     background:linear-gradient(90deg,rgba(29,109,255,.55),#38d8ff);
     box-shadow:0 0 10px rgba(56,216,255,.55);transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
   .rank .num{width:52px;text-align:right;flex:none;font-family:"DIN Alternate",Consolas,monospace;font-size:13px;color:#d9efff}
+  .rank.plain .track{display:none}
+  .rank.plain .name{width:auto;flex:1}
+  .rank.plain .num{width:70px}
 
   .rings{display:grid;grid-template-columns:repeat(3,1fr);height:100%;align-items:center}
   .ring{display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -216,7 +219,7 @@
         <div class="panel">
           <div class="ptitle"><h3>今日校区课时排行</h3><span class="sub">TODAY CAMPUS</span></div>
           <div class="body">
-            <div class="rank" id="rankList"></div>
+            <div class="rank plain" id="rankList"></div>
           </div>
         </div>
         <div class="panel">

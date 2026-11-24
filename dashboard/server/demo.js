@@ -60,8 +60,11 @@ function demo() {
       { name: 'CPU', value: 62 }, { name: '内存', value: 78 }, { name: '带宽', value: 45 }
     ],
     channel: [
-      { name: '移动端', value: 42 }, { name: 'Web 端', value: 28 },
-      { name: '小程序', value: 18 }, { name: '开放 API', value: 12 }
+      { name: '金牌教练', value: 5403.8 }, { name: '银牌教练', value: 3428.5 },
+      { name: '王牌教练', value: 1946.0 }, { name: '教练', value: 606.0 },
+      { name: '白金教练', value: 327.0 }, { name: '钻石教练', value: 177.0 },
+      { name: '初级专家', value: 135.3 }, { name: '助教', value: 83.0 },
+      { name: '高级专家', value: 41.8 }, { name: '特级专家', value: 4.0 }
     ],
     ai: [
       { name: '智能问答', value: 92 }, { name: '作业批改', value: 84 },

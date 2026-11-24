@@ -283,7 +283,7 @@
       <!-- RIGHT -->
       <section class="col right">
         <div class="panel">
-          <div class="ptitle"><h3>访问渠道占比</h3><span class="sub">CHANNEL</span></div>
+          <div class="ptitle"><h3>教练等级课时占比</h3><span class="sub">TEACH LEVEL HOURS</span></div>
           <div class="body">
             <div class="donut-wrap">
               <div class="cv">
@@ -819,8 +819,11 @@
       ctx.shadowBlur = 0;
       startAngle += (Number(d.value || 0) / total) * Math.PI * 2 * p;
     });
-    var visits = Number(DATA.kpis && DATA.kpis.visits ? DATA.kpis.visits : total);
-    $('donutTotal').textContent = Math.round(visits * p).toLocaleString('en-US');
+    var hours = total * p;
+    var display = hours >= 1000
+      ? (hours / 1000).toFixed(1) + 'k'
+      : Math.round(hours).toLocaleString('en-US');
+    $('donutTotal').textContent = display + 'h';
   });
 
   /* ---------- DOM 列表 ---------- */

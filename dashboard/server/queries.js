@@ -302,6 +302,25 @@ async function collect(connection, period) {
  * 返回大屏所需的全部指标。
  * 连接参数来自 DASH_CONFIG（JSON）或独立环境变量，未配置或查询失败时回落到演示数据。
  */
+async function loadLevelHours(connection) {
+  const [rows] = await connection.query(
+    "SELECT u.teach_level, ROUND(SUM(l.hour_count), 1) AS h " +
+    "FROM de_student_hour_lessons l " +
+    "JOIN de_admin_users u ON u.id = l.teacher_id " +
+    "WHERE l.start_time >= UNIX_TIMESTAMP(CURDATE()) " +
+    "AND l.deleted_at IS NULL " +
+    "GROUP BY u.teach_level " +
+    "ORDER BY h DESC"
+  );
+  const levelNames = { 0: '助教', 10: '教练', 20: '银牌教练', 30: '金牌教练',
+    35: '白金教练', 40: '王牌教练', 43: '钻石教练', 45: '初级专家',
+    50: '高级专家', 60: '特级专家' };
+  return rows.map(function (r) {
+    return { name: levelNames[Number(r.teach_level)] || ('等级' + r.teach_level),
+             value: Number(r.h) || 0 };
+  }).filter(function (d) { return d.value > 0; });
+}
+
 async function loadWeeklyLessons(connection) {
   const [rows] = await connection.query(
     "SELECT CONCAT(FROM_UNIXTIME(start_time,'%m-%d'), ' ', " +
@@ -350,6 +369,11 @@ async function loadMetrics() {
       data.weekLessons = await loadWeeklyLessons(db);
     } catch (weekErr) {
       console.error('[db] weekly query failed:', weekErr.message);
+    }
+    try {
+      data.channel = await loadLevelHours(db);
+    } catch (chErr) {
+      console.error('[db] level-hours query failed:', chErr.message);
     }
     data.source = 'db';
     data.updatedAt = new Date().toISOString();

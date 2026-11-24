@@ -259,11 +259,10 @@
         </div>
 
         <div class="panel hero-chart">
-          <div class="chart-tag">PLATFORM REAL-TIME TRAFFIC / 24H</div>
+          <div class="chart-tag">近 7 天正课 / 体验课课时</div>
           <div class="legend">
-            <span><i style="background:#38e8ff;box-shadow:0 0 8px #38e8ff"></i>访问量</span>
-            <span><i style="background:#a78bfa"></i>学习时长</span>
-            <span><i style="background:#34d399"></i>AI 调用</span>
+            <span><i style="background:#38e8ff;box-shadow:0 0 8px #38e8ff"></i>正课课时</span>
+            <span><i style="background:#fbbf24;box-shadow:0 0 8px #fbbf24"></i>体验课课时</span>
           </div>
           <div class="body"><canvas id="cMain"></canvas></div>
         </div>
@@ -637,17 +636,17 @@
     series(s1, '#38e8ff', true);
   });
 
-  /* ---------- 24h 实时流量 ---------- */
-  renderers.push(function (p, now) {
+  /* ---------- 近 7 天课时趋势 ---------- */
+  renderers.push(function (p) {
     var r = prep($('cMain'));
     if (!r) return;
-    var d = DATA.traffic || {};
-    var labels = d.labels || [], sa = d.visits || [], sb = d.study || [], sc = d.ai || [];
-    if (!labels.length) return;
+    var d = DATA.weekLessons || {};
+    var labels = d.labels || [], sa = d.regular || [], sb = d.trial || [];
+    if (!labels.length || !sa.length) return;
     var ctx = r.ctx, w = r.w, h = r.h;
-    var m = { l: 44, r: 18, t: 30, b: 26 };
+    var m = { l: 50, r: 18, t: 30, b: 26 };
     var iw = w - m.l - m.r, ih = h - m.t - m.b;
-    var max = Math.max.apply(null, sa.concat(sb, sc)) * 1.12 || 1;
+    var max = Math.max.apply(null, sa.concat(sb)) * 1.18 || 1;
 
     ctx.font = '10px Consolas, monospace';
     ctx.textBaseline = 'middle';
@@ -657,35 +656,33 @@
       ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke();
       ctx.fillStyle = 'rgba(110,150,190,.75)';
       ctx.textAlign = 'right';
-      ctx.fillText(fmtK(max - (max / 4) * g), m.l - 8, y);
+      ctx.fillText(fmtK(max - (max / 4) * g) + 'h', m.l - 10, y);
     }
+    ctx.textAlign = 'center';
     labels.forEach(function (lb, i) {
-      if (i % 3 !== 0) return;
       var x = m.l + (iw / Math.max(labels.length - 1, 1)) * i;
-      ctx.strokeStyle = 'rgba(90,160,240,.06)';
-      ctx.beginPath(); ctx.moveTo(x, m.t); ctx.lineTo(x, m.t + ih); ctx.stroke();
-      ctx.fillStyle = 'rgba(110,150,190,.8)';
-      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(110,150,190,.85)';
       ctx.fillText(lb, x, h - 10);
     });
 
     function toPts(data) {
       return data.map(function (v, i) {
-        return { x: m.l + (iw / Math.max(data.length - 1, 1)) * i, y: m.t + ih - (v / max) * ih };
+        return { x: m.l + (iw / Math.max(data.length - 1, 1)) * i, y: m.t + ih - (v / max) * ih * p, v: v };
       });
     }
-    var pa = toPts(sa), pb = toPts(sb), pc = toPts(sc);
+    var pa = toPts(sa), pb = toPts(sb);
 
     ctx.save();
     ctx.beginPath();
-    ctx.rect(m.l, 0, iw * p, h);
+    ctx.rect(m.l, 0, iw, h);
     ctx.clip();
 
-    var grad = ctx.createLinearGradient(0, m.t, 0, m.t + ih);
-    grad.addColorStop(0, 'rgba(56,232,255,.34)');
-    grad.addColorStop(.55, 'rgba(56,232,255,.10)');
-    grad.addColorStop(1, 'rgba(56,232,255,0)');
-    ctx.fillStyle = grad;
+    // 正课填充
+    var gradA = ctx.createLinearGradient(0, m.t, 0, m.t + ih);
+    gradA.addColorStop(0, 'rgba(56,232,255,.30)');
+    gradA.addColorStop(.6, 'rgba(56,232,255,.06)');
+    gradA.addColorStop(1, 'rgba(56,232,255,0)');
+    ctx.fillStyle = gradA;
     ctx.beginPath();
     smooth(ctx, pa);
     ctx.lineTo(pa[pa.length - 1].x, m.t + ih);
@@ -693,37 +690,32 @@
     ctx.closePath();
     ctx.fill();
 
-    function line(pts, color, blur) {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.lineJoin = 'round';
-      ctx.shadowColor = color;
-      ctx.shadowBlur = blur;
-      ctx.beginPath();
-      smooth(ctx, pts);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    }
-    line(pc, 'rgba(52,211,153,.9)', 8);
-    line(pb, 'rgba(167,139,250,.95)', 8);
-    line(pa, '#38e8ff', 14);
-    ctx.restore();
+    // 正课线（主色 #38e8ff）
+    ctx.strokeStyle = '#38e8ff';
+    ctx.lineWidth = 2.4;
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = '#38e8ff';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    smooth(ctx, pa);
+    ctx.stroke();
 
-    if (p >= 1 && pa.length > 1) {
-      var phase = ((now - animStart) % 7000) / 7000;
-      var fi = phase * (pa.length - 1);
-      var i0 = Math.floor(fi), i1 = Math.min(i0 + 1, pa.length - 1), fr = fi - i0;
-      var x = pa[i0].x + (pa[i1].x - pa[i0].x) * fr;
-      var y = pa[i0].y + (pa[i1].y - pa[i0].y) * fr;
-      var rg = ctx.createRadialGradient(x, y, 0, x, y, 14);
-      rg.addColorStop(0, 'rgba(150,245,255,.95)');
-      rg.addColorStop(.4, 'rgba(56,232,255,.45)');
-      rg.addColorStop(1, 'rgba(56,232,255,0)');
-      ctx.fillStyle = rg;
-      ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#eafcff';
-      ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
-    }
+    // 体验课线（琥珀色）
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#fbbf24';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    smooth(ctx, pb);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // 数据点
+    ctx.fillStyle = '#38e8ff';
+    pa.forEach(function (pt) { ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.8, 0, Math.PI * 2); ctx.fill(); });
+    ctx.fillStyle = '#fbbf24';
+    pb.forEach(function (pt) { ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.6, 0, Math.PI * 2); ctx.fill(); });
+    ctx.restore();
   });
 
   /* ---------- 区域在线 ---------- */

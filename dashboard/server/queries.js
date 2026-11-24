@@ -302,6 +302,25 @@ async function collect(connection, period) {
  * 返回大屏所需的全部指标。
  * 连接参数来自 DASH_CONFIG（JSON）或独立环境变量，未配置或查询失败时回落到演示数据。
  */
+async function loadWeeklyLessons(connection) {
+  const [rows] = await connection.query(
+    "SELECT FROM_UNIXTIME(start_time,'%m-%d') AS d, " +
+    "SUM(CASE WHEN trial_lesson_id = 0 THEN hour_count ELSE 0 END) AS regular_h, " +
+    "SUM(CASE WHEN trial_lesson_id <> 0 THEN hour_count ELSE 0 END) AS trial_h " +
+    "FROM de_student_hour_lessons " +
+    "WHERE deleted_at IS NULL " +
+    "AND start_time >= UNIX_TIMESTAMP(CURDATE() - INTERVAL 6 DAY) " +
+    "AND start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) " +
+    "GROUP BY FROM_UNIXTIME(start_time,'%Y-%m-%d') " +
+    "ORDER BY MIN(start_time)"
+  );
+  return {
+    labels: rows.map(function (r) { return r.d; }),
+    regular: rows.map(function (r) { return Number(r.regular_h) || 0; }),
+    trial: rows.map(function (r) { return Number(r.trial_h) || 0; })
+  };
+}
+
 async function loadMetrics() {
   if (!DB.host) return demo();
 
@@ -323,6 +342,11 @@ async function loadMetrics() {
     } catch (eventErr) {
       console.error('[db] events query failed:', eventErr.message);
       data.events = [];
+    }
+    try {
+      data.weekLessons = await loadWeeklyLessons(db);
+    } catch (weekErr) {
+      console.error('[db] weekly query failed:', weekErr.message);
     }
     data.source = 'db';
     data.updatedAt = new Date().toISOString();

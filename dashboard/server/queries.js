@@ -554,21 +554,14 @@ async function loadSchoolMap(connection) {
 
 /** 中下2：4 张人口统计卡（学生/校区/教务/教练，总数 + 今日新增） */
 async function loadPopStats(connection) {
-  // 学生：de_students（关联有效直营校区）∪ 有过排课记录的 student_id
+  // 学生：de_students 挂靠在有效直营校区的建档学生
   const [st] = await connection.query(
-    "SELECT COUNT(*) total, SUM(first_at >= CURDATE()) today_new FROM (" +
-    "  SELECT id, MIN(first_at) AS first_at FROM (" +
-    "    SELECT s.id AS id, s.created_at AS first_at " +
-    "    FROM de_students s " +
-    "    JOIN de_schools sc ON sc.id = s.school_id " +
-    "      AND sc.deleted_at IS NULL AND sc.company_id = 0 " +
-    "    WHERE s.deleted_at IS NULL " +
-    "    UNION ALL " +
-    "    SELECT l.student_id AS id, l.created_at AS first_at " +
-    "    FROM de_student_hour_lessons l " +
-    "    WHERE l.deleted_at IS NULL AND l.student_id > 0 " +
-    "  ) u GROUP BY id" +
-    ") t"
+    "SELECT COUNT(*) total, " +
+    "SUM(s.created_at >= CURDATE()) today_new " +
+    "FROM de_students s " +
+    "JOIN de_schools sc ON sc.id = s.school_id " +
+    "  AND sc.deleted_at IS NULL AND sc.company_id = 0 " +
+    "WHERE s.deleted_at IS NULL"
   );
   // 校区：company_id=0 直营
   const [sc] = await connection.query(

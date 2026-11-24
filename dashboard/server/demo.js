@@ -51,9 +51,14 @@ function demo() {
       { name: '体验课支付', value: 2 }
     ],
     rank: [
-      { name: '王红莉', value: 71.5 }, { name: '华莉', value: 63.5 },
-      { name: '王智群', value: 62.0 }, { name: '任重伟', value: 60.5 },
-      { name: '韩晓媛', value: 60.5 }, { name: '张施瑶', value: 57.0 }
+      { name: '高新校区', value: 9.0 }, { name: '曲江校区', value: 7.0 },
+      { name: '经开校区', value: 6.5 }, { name: '雁塔校区', value: 5.0 },
+      { name: '碑林校区', value: 4.5 }, { name: '长安校区', value: 3.5 }
+    ],
+    teacherRank: [
+      { name: '张兴伟', value: 3.0 }, { name: '孟夏', value: 3.0 },
+      { name: '彦楠', value: 3.0 }, { name: '陆金莲', value: 3.0 },
+      { name: '张老师', value: 3.0 }, { name: '陈菡', value: 3.0 }
     ],
     load: [
       { name: '教练利用率', value: 11 },
@@ -66,11 +71,6 @@ function demo() {
       { name: '白金教练', value: 327.0 }, { name: '钻石教练', value: 177.0 },
       { name: '初级专家', value: 135.3 }, { name: '助教', value: 83.0 },
       { name: '高级专家', value: 41.8 }, { name: '特级专家', value: 4.0 }
-    ],
-    ai: [
-      { name: '智能问答', value: 92 }, { name: '作业批改', value: 84 },
-      { name: '学情分析', value: 76 }, { name: '语音评测', value: 68 },
-      { name: '内容生成', value: 61 }
     ],
     core: [
       { name: '教练利用率', value: '1,917 / 16,885', unit: ' 人', percent: 11 },

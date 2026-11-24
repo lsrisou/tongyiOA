@@ -214,7 +214,7 @@
           <div class="body"><canvas id="cTrend"></canvas></div>
         </div>
         <div class="panel">
-          <div class="ptitle"><h3>教练课时 TOP 6</h3><span class="sub">TODAY HOT</span></div>
+          <div class="ptitle"><h3>今日校区课时排行</h3><span class="sub">TODAY CAMPUS</span></div>
           <div class="body">
             <div class="rank" id="rankList"></div>
           </div>
@@ -299,8 +299,8 @@
           <div class="body"><div class="events" id="eventList"></div></div>
         </div>
         <div class="panel">
-          <div class="ptitle"><h3>AI 能力调用分布</h3><span class="sub">AI SERVICE</span></div>
-          <div class="body"><div class="ai-list" id="aiList"></div></div>
+          <div class="ptitle"><h3>教练课时 TOP 6</h3><span class="sub">TODAY HOT</span></div>
+          <div class="body"><div class="rank" id="teacherRankList"></div></div>
         </div>
       </section>
     </main>
@@ -420,19 +420,19 @@
       { name: '华中', value: 41 }
     ],
     rank: [
-      { name: '计算机学院', value: 9820 }, { name: '人工智能学院', value: 8740 },
-      { name: '数学与统计学院', value: 7320 }, { name: '外国语学院', value: 6180 },
-      { name: '经济管理学院', value: 5240 }, { name: '艺术设计学院', value: 4310 }
+      { name: '高新校区', value: 9.0 }, { name: '曲江校区', value: 7.0 },
+      { name: '经开校区', value: 6.5 }, { name: '雁塔校区', value: 5.0 },
+      { name: '碑林校区', value: 4.5 }, { name: '长安校区', value: 3.5 }
+    ],
+    teacherRank: [
+      { name: '张兴伟', value: 3.0 }, { name: '孟夏', value: 3.0 },
+      { name: '彦楠', value: 3.0 }, { name: '陆金莲', value: 3.0 },
+      { name: '张老师', value: 3.0 }, { name: '陈菡', value: 3.0 }
     ],
     load: [{ name: 'CPU', value: 62 }, { name: '内存', value: 78 }, { name: '带宽', value: 45 }],
     channel: [
       { name: '移动端', value: 42 }, { name: 'Web 端', value: 28 },
       { name: '小程序', value: 18 }, { name: '开放 API', value: 12 }
-    ],
-    ai: [
-      { name: '智能问答', value: 92 }, { name: '作业批改', value: 84 },
-      { name: '学情分析', value: 76 }, { name: '语音评测', value: 68 },
-      { name: '内容生成', value: 61 }
     ],
     core: [
       { name: '日均学习时长', value: '48.6', unit: ' min', percent: 82 },
@@ -827,9 +827,10 @@
   });
 
   /* ---------- DOM 列表 ---------- */
-  function buildRank() {
-    var wrap = $('rankList');
-    var data = DATA.rank || [];
+  function buildRank(elId, data) {
+    var wrap = $(elId);
+    if (!wrap) return;
+    data = data || [];
     var max = Math.max.apply(null, [1].concat(data.map(function (d) { return Number(d.value) || 0; })));
     wrap.innerHTML = '';
     data.forEach(function (d, i) {
@@ -892,25 +893,6 @@
         el.style.width = (Number(data[i].percent) || 0) + '%';
       });
     }, 120);
-  }
-
-  function buildAi() {
-    var wrap = $('aiList');
-    var data = DATA.ai || [];
-    wrap.innerHTML = '';
-    data.forEach(function (d) {
-      var el = document.createElement('div');
-      el.className = 'ai-row';
-      el.innerHTML = '<span class="n">' + d.name + '</span><span class="tr"><i></i></span>' +
-        '<span class="v">' + Math.round(Number(d.value) || 0) + '%</span>';
-      wrap.appendChild(el);
-    });
-    setTimeout(function () {
-      wrap.querySelectorAll('.tr i').forEach(function (el, i) {
-        el.style.transition = 'width 1.6s cubic-bezier(.2,.8,.2,1)';
-        el.style.width = Math.min(Number(data[i].value) || 0, 100) + '%';
-      });
-    }, 160);
   }
 
   /* ---------- 事件流 ---------- */
@@ -1047,11 +1029,11 @@
   }
 
   /* ---------- 初始化 + 数据拉取 ---------- */
-  buildRank();
+  buildRank('rankList', DATA.rank);
+  buildRank('teacherRankList', DATA.teacherRank);
   buildRings();
   buildDonutLegend();
   buildCore();
-  buildAi();
   buildEvents();
   requestAnimationFrame(loop);
 
@@ -1066,11 +1048,11 @@
         DATA = payload;
         animStart = performance.now();
         updateKpis(false);
-        buildRank();
+        buildRank('rankList', DATA.rank);
+        buildRank('teacherRankList', DATA.teacherRank);
         buildRings();
         buildDonutLegend();
         buildCore();
-        buildAi();
         buildEvents();
         var t = new Date(payload.updatedAt || Date.now());
         $('syncText').textContent = (payload.source === 'db' ? '数据库实时' : '演示数据') +

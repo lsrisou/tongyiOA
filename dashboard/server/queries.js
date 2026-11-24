@@ -322,8 +322,27 @@ async function loadLevelHours(connection) {
   }).filter(function (d) { return d.value > 0; });
 }
 
-/** 左2：今日教练课时 TOP 6 */
-async function loadRank(connection) {
+/** 左2：今日校区课时排行 TOP 6 */
+async function loadSchoolRank(connection) {
+  const [rows] = await connection.query(
+    'SELECT s.name AS name, ROUND(SUM(l.hour_count), 1) AS h ' +
+    'FROM de_student_hour_lessons l ' +
+    'JOIN de_schools s ON s.id = l.school_id ' +
+    'WHERE l.school_id <> 0 ' +
+    'AND s.deleted_at IS NULL ' +
+    'AND l.start_time >= UNIX_TIMESTAMP(CURDATE()) ' +
+    'AND l.start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) ' +
+    'AND l.deleted_at IS NULL ' +
+    'GROUP BY l.school_id ' +
+    'ORDER BY h DESC LIMIT 6'
+  );
+  return rows.map(function (r) {
+    return { name: r.name || '未知校区', value: Number(r.h) || 0 };
+  });
+}
+
+/** 右3：今日教练课时 TOP 6 */
+async function loadTeacherRank(connection) {
   const [rows] = await connection.query(
     'SELECT u.name AS name, ROUND(SUM(l.hour_count), 1) AS h ' +
     'FROM de_student_hour_lessons l ' +
@@ -536,9 +555,14 @@ async function loadMetrics() {
       console.error('[db] level-hours query failed:', chErr.message);
     }
     try {
-      data.rank = await loadRank(db);
+      data.rank = await loadSchoolRank(db);
     } catch (rErr) {
-      console.error('[db] rank query failed:', rErr.message);
+      console.error('[db] school-rank query failed:', rErr.message);
+    }
+    try {
+      data.teacherRank = await loadTeacherRank(db);
+    } catch (trErr) {
+      console.error('[db] teacher-rank query failed:', trErr.message);
     }
     try {
       data.load = await loadLoad(db);

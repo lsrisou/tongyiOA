@@ -221,18 +221,29 @@ function parseCourseId(content) {
 async function loadEvents(connection) {
   const [rows] = await connection.query(
     "SELECT l.action, DATE_FORMAT(l.created_at, '%H:%i') AS time_text, " +
-    "LEFT(l.content, 2000) AS content, u.name AS user_name, u.role_id, u.teach_level " +
+    "LEFT(l.content, 2000) AS content, " +
+    "u_op.name AS op_name, u_op.role_id AS op_role_id, u_op.teach_level AS op_teach_level, " +
+    "u_target.name AS target_name, s.name AS school_name " +
     'FROM de_admin_action_logs l ' +
-    'LEFT JOIN de_admin_users u ON u.id = IF(l.user_id <> 0, l.user_id, l.creator) ' +
+    'LEFT JOIN de_admin_users u_op ON u_op.id = l.creator ' +
+    'LEFT JOIN de_admin_users u_target ON u_target.id = l.user_id AND l.user_id <> 0 ' +
+    'LEFT JOIN de_schools s ON s.id = l.school_id AND l.school_id <> 0 ' +
     'ORDER BY l.id DESC LIMIT 20'
   );
   return rows.map(function (row) {
+    var who = (row.op_name || '系统') + ' · ' + resolveRole(row.op_role_id, row.op_teach_level);
+    var extra = [];
+    if (row.target_name) extra.push('对 ' + row.target_name);
+    if (row.school_name) extra.push('@ ' + row.school_name);
     return {
       time: row.time_text,
       action: row.action,
       level: actionLevel(row.action || ''),
-      operator: row.user_name || '系统',
-      role: resolveRole(row.role_id, row.teach_level),
+      operator: who,
+      target: row.target_name || '',
+      school: row.school_name || '',
+      tail: extra.join(' '),
+      role: resolveRole(row.op_role_id, row.op_teach_level),
       courseId: parseCourseId(row.content)
     };
   });

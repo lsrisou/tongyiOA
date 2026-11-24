@@ -163,7 +163,12 @@
   .ev .t{flex:none;width:38px;font-family:Consolas,monospace;font-size:11px;color:#4f7ba3}
   .ev .d{flex:none;width:6px;height:6px;border-radius:50%;box-shadow:0 0 8px currentColor}
   .ev .m{flex:1;color:#a9c9e4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ev .m em{font-style:normal;color:#7dd3fc}
+  .ev .m em.who{font-style:normal;color:#7dd3fc}
+  .ev .m .role{color:#5b82a6;margin-right:4px}
+  .ev .m .tail{color:#4f7ba6;margin:0 4px}
+  .ev .m .tail .tgt{color:#8ab4d8}
+  .ev .m .tail .sch{color:#9bbfe0}
+  .ev .m .act{color:#a9c9e4}
   @keyframes evIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
 
   .ai-list{display:flex;flex-direction:column;justify-content:space-around;height:100%}
@@ -968,13 +973,25 @@
       list.forEach(function (e) {
         var color = EV_COLORS[e.level] || EV_COLORS.info;
         var who = e.operator || '系统';
-        if (e.role) who += ' · ' + e.role;
-        var text = (e.action || '操作') + (e.courseId ? ' · 课程#' + e.courseId : '');
+        // 拆分 "姓名 · 角色"
+        var whoParts = String(who).split(' · ');
+        var name = escHtml(whoParts[0] || who);
+        var role = whoParts.length > 1 ? escHtml(whoParts.slice(1).join(' · ')) : '';
+        var tail = '';
+        if (e.target) tail += '<span class="tgt">对 ' + escHtml(e.target) + '</span>';
+        if (e.school) tail += '<span class="sch">@ ' + escHtml(e.school) + '</span>';
+        var actionText = escHtml(e.action || '操作') + (e.courseId ? ' · 课程#' + escHtml(String(e.courseId)) : '');
         var el = document.createElement('div');
         el.className = 'ev';
-        el.innerHTML = '<span class="t">' + escHtml(e.time || '') + '</span>' +
+        el.innerHTML =
+          '<span class="t">' + escHtml(e.time || '') + '</span>' +
           '<span class="d" style="background:' + color + ';color:' + color + '"></span>' +
-          '<span class="m"><em>' + escHtml(who) + '</em> ' + escHtml(text) + '</span>';
+          '<span class="m">' +
+            '<em class="who">' + name + '</em>' +
+            (role ? '<span class="role">' + role + '</span>' : '') +
+            (tail ? '<span class="tail">' + tail + '</span>' : '') +
+            '<span class="act">' + actionText + '</span>' +
+          '</span>';
         track.appendChild(el);
       });
     }

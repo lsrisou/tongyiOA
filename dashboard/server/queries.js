@@ -169,6 +169,32 @@ const TEACH_LEVELS = {
   60: '特级专家'
 };
 
+const ROLE_LABELS = {
+  school_dean: '教务',
+  school_headmaster: '校长',
+  school_deputymaster: '副校长',
+  top_manager: '运营总监',
+  top_dean: '教务督导',
+  top_treasurer: '财务督导',
+  school_salesman: '课程顾问',
+  school_pre_teacher: '预教练',
+  school_pre_master: '预备校长',
+  school_counsellor: '学习顾问',
+  school_treasurer: '财务',
+  school_promoter: '市场',
+  school_premaster: '预备校长',
+  company_manager: '公司管理员'
+};
+
+function resolveRole(roleId, teachLevel) {
+  if (roleId === 'school_teacher') {
+    return TEACH_LEVELS[Number(teachLevel)] || TEACH_LEVELS[0];
+  }
+  if (ROLE_LABELS[roleId]) return ROLE_LABELS[roleId];
+  // 未登记的角色直接回显 role_id，便于后续补字典
+  return roleId || '';
+}
+
 function actionLevel(action) {
   if (/退课|退约|退款|驳回|取消|禁用|删除/.test(action)) return 'error';
   if (/转化成功|通过|签署|新增|创建|报名/.test(action)) return 'success';
@@ -195,7 +221,7 @@ function parseCourseId(content) {
 async function loadEvents(connection) {
   const [rows] = await connection.query(
     "SELECT l.action, DATE_FORMAT(l.created_at, '%H:%i') AS time_text, " +
-    "LEFT(l.content, 2000) AS content, u.name AS user_name, u.teach_level " +
+    "LEFT(l.content, 2000) AS content, u.name AS user_name, u.role_id, u.teach_level " +
     'FROM de_admin_action_logs l ' +
     'LEFT JOIN de_admin_users u ON u.id = IF(l.user_id <> 0, l.user_id, l.creator) ' +
     'ORDER BY l.id DESC LIMIT 20'
@@ -206,7 +232,7 @@ async function loadEvents(connection) {
       action: row.action,
       level: actionLevel(row.action || ''),
       operator: row.user_name || '系统',
-      role: TEACH_LEVELS[Number(row.teach_level)] || '',
+      role: resolveRole(row.role_id, row.teach_level),
       courseId: parseCourseId(row.content)
     };
   });

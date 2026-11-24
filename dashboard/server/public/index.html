@@ -89,6 +89,14 @@
   .ptitle .sub{margin-left:auto;font-size:11px;letter-spacing:.1em;color:#527ea8}
   .body{flex:1;min-height:0;position:relative}
   canvas{display:block;width:100%;height:100%}
+  .ptitle .sub.lg{display:flex;align-items:center;gap:5px;font-size:10px;letter-spacing:.04em;color:#8fb6d8}
+  .ptitle .sub.lg i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle}
+  .ptitle .sub.lg i.a{background:#38e8ff;box-shadow:0 0 8px #38e8ff}
+  .ptitle .sub.lg i.b{background:#fbbf24;box-shadow:0 0 8px #fbbf24;margin-left:8px}
+  #mapChart{width:100%;height:100%}
+  .map-stat{position:absolute;left:16px;bottom:12px;display:flex;gap:18px;z-index:2;
+    font-size:11px;letter-spacing:.06em;color:#7fa6c9;pointer-events:none}
+  .map-stat b{font-family:"DIN Alternate",Consolas,monospace;font-size:16px;color:#e6f7ff;margin-right:4px;font-weight:600}
 
   /* ---------- kpi ---------- */
   .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
@@ -222,7 +230,9 @@
       <!-- LEFT -->
       <section class="col left">
         <div class="panel">
-          <div class="ptitle"><h3>近七日学习趋势</h3><span class="sub">LEARNING TREND</span></div>
+          <div class="ptitle"><h3>近 7 天正课 / 体验课课时</h3>
+            <span class="sub lg"><i class="a"></i>正课<i class="b"></i>体验</span>
+          </div>
           <div class="body"><canvas id="cTrend"></canvas></div>
         </div>
         <div class="panel">
@@ -270,12 +280,11 @@
         </div>
 
         <div class="panel hero-chart">
-          <div class="chart-tag">近 7 天正课 / 体验课课时</div>
-          <div class="legend">
-            <span><i style="background:#38e8ff;box-shadow:0 0 8px #38e8ff"></i>正课课时</span>
-            <span><i style="background:#fbbf24;box-shadow:0 0 8px #fbbf24"></i>体验课课时</span>
+          <div class="ptitle"><h3>全国校区分布</h3><span class="sub">CAMPUS MAP · 校长手机号归属地</span></div>
+          <div class="body">
+            <div id="mapChart"></div>
+            <div class="map-stat" id="mapStat"></div>
           </div>
-          <div class="body"><canvas id="cMain"></canvas></div>
         </div>
 
         <div class="bottom-grid">
@@ -321,6 +330,7 @@
   </div>
 </div>
 
+<script src="vendor/echarts.min.js"></script>
 <script>
 (function () {
   'use strict';
@@ -468,7 +478,28 @@
       { name: '师生互动次数', value: '86,320', unit: ' 次', percent: 74 },
       { name: '智能推荐命中率', value: '93.2', unit: ' %', percent: 93 }
     ],
-    events: []
+    events: [],
+    weekLessons: {
+      labels: ['06-18 周三', '06-19 周四', '06-20 周五', '06-21 周六', '06-22 周日', '06-23 周一', '06-24 周二'],
+      regular: [488.5, 464.5, 711.2, 2923.2, 2734.2, 434.8, 375.0],
+      trial: [59.0, 52.0, 95.0, 347.0, 362.0, 73.0, 24.0]
+    },
+    schoolMap: {
+      total: 6341,
+      unknown: 35,
+      provinces: [
+        { name: '四川', value: 619 }, { name: '湖北', value: 573 },
+        { name: '江西', value: 549 }, { name: '浙江', value: 526 },
+        { name: '湖南', value: 509 }, { name: '江苏', value: 319 },
+        { name: '新疆', value: 309 }, { name: '山东', value: 301 },
+        { name: '北京', value: 290 }, { name: '河北', value: 270 },
+        { name: '内蒙古', value: 252 }, { name: '广东', value: 242 },
+        { name: '河南', value: 206 }, { name: '贵州', value: 138 },
+        { name: '福建', value: 136 }, { name: '甘肃', value: 118 },
+        { name: '陕西', value: 117 }, { name: '重庆', value: 111 },
+        { name: '天津', value: 109 }, { name: '上海', value: 107 }
+      ]
+    }
   };
 
   var DATA = JSON.parse(JSON.stringify(DEMO));
@@ -596,100 +627,35 @@
     requestAnimationFrame(loop);
   }
 
-  /* ---------- 7 日趋势 ---------- */
+  /* ---------- 近 7 天正课 / 体验课课时（左 1） ---------- */
   renderers.push(function (p) {
     var r = prep($('cTrend'));
-    if (!r) return;
-    var d = DATA.trend || {};
-    var labels = d.labels || [], s1 = d.learners || [], s2 = d.completed || [];
-    if (!labels.length || !s1.length) return;
-    var ctx = r.ctx, w = r.w, h = r.h;
-    var m = { l: 42, r: 12, t: 14, b: 24 };
-    var iw = w - m.l - m.r, ih = h - m.t - m.b;
-    var max = Math.max.apply(null, s1.concat(s2)) * 1.15 || 1;
-
-    ctx.font = '10px Consolas, monospace';
-    ctx.textBaseline = 'middle';
-    for (var g = 0; g <= 4; g++) {
-      var y = m.t + (ih / 4) * g;
-      ctx.strokeStyle = 'rgba(90,160,240,.12)';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke();
-      ctx.fillStyle = 'rgba(110,150,190,.75)';
-      ctx.textAlign = 'right';
-      ctx.fillText(fmtK(max - (max / 4) * g), m.l - 7, y);
-    }
-    ctx.textAlign = 'center';
-    labels.forEach(function (lb, i) {
-      var x = m.l + (iw / Math.max(labels.length - 1, 1)) * i;
-      ctx.fillStyle = 'rgba(110,150,190,.8)';
-      ctx.fillText(lb, x, h - 9);
-    });
-
-    function series(data, color, fill) {
-      if (!data.length) return;
-      var pts = data.map(function (v, i) {
-        return { x: m.l + (iw / Math.max(data.length - 1, 1)) * i, y: m.t + ih - (v / max) * ih * p };
-      });
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(m.l, 0, iw * p, h);
-      ctx.clip();
-      if (fill) {
-        var fg = ctx.createLinearGradient(0, m.t, 0, m.t + ih);
-        fg.addColorStop(0, 'rgba(56,216,255,.35)');
-        fg.addColorStop(1, 'rgba(56,216,255,0)');
-        ctx.fillStyle = fg;
-        ctx.beginPath();
-        smooth(ctx, pts);
-        ctx.lineTo(pts[pts.length - 1].x, m.t + ih);
-        ctx.lineTo(pts[0].x, m.t + ih);
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      smooth(ctx, pts);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = color;
-      pts.forEach(function (pt) { ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.4, 0, Math.PI * 2); ctx.fill(); });
-      ctx.restore();
-    }
-    series(s2, 'rgba(167,139,250,.95)', false);
-    series(s1, '#38e8ff', true);
-  });
-
-  /* ---------- 近 7 天课时趋势 ---------- */
-  renderers.push(function (p) {
-    var r = prep($('cMain'));
     if (!r) return;
     var d = DATA.weekLessons || {};
     var labels = d.labels || [], sa = d.regular || [], sb = d.trial || [];
     if (!labels.length || !sa.length) return;
     var ctx = r.ctx, w = r.w, h = r.h;
-    var m = { l: 50, r: 18, t: 30, b: 26 };
+    var m = { l: 44, r: 12, t: 16, b: 22 };
     var iw = w - m.l - m.r, ih = h - m.t - m.b;
-    var max = Math.max.apply(null, sa.concat(sb)) * 1.18 || 1;
+    var max = Math.max.apply(null, sa.concat(sb)) * 1.15 || 1;
+    var shorts = labels.map(function (lb) { return String(lb).split(' ').pop(); });
 
     ctx.font = '10px Consolas, monospace';
     ctx.textBaseline = 'middle';
     for (var g = 0; g <= 4; g++) {
-      var y = m.t + (ih / 4) * g;
+      var gy = m.t + (ih / 4) * g;
       ctx.strokeStyle = 'rgba(90,160,240,.12)';
-      ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(m.l, gy); ctx.lineTo(w - m.r, gy); ctx.stroke();
       ctx.fillStyle = 'rgba(110,150,190,.75)';
       ctx.textAlign = 'right';
-      ctx.fillText(fmtK(max - (max / 4) * g) + 'h', m.l - 10, y);
+      ctx.fillText(fmtK(max - (max / 4) * g), m.l - 7, gy);
     }
     ctx.textAlign = 'center';
-    labels.forEach(function (lb, i) {
-      var x = m.l + (iw / Math.max(labels.length - 1, 1)) * i;
+    shorts.forEach(function (lb, i) {
+      var x = m.l + (iw / Math.max(shorts.length - 1, 1)) * i;
       ctx.fillStyle = 'rgba(110,150,190,.85)';
-      ctx.fillText(lb, x, h - 10);
+      ctx.fillText(lb, x, h - 9);
     });
 
     function toPts(data) {
@@ -700,49 +666,45 @@
     var pa = toPts(sa), pb = toPts(sb);
 
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(m.l, 0, iw, h);
-    ctx.clip();
+    ctx.beginPath(); ctx.rect(m.l, 0, iw, h); ctx.clip();
 
-    // 正课填充
     var gradA = ctx.createLinearGradient(0, m.t, 0, m.t + ih);
     gradA.addColorStop(0, 'rgba(56,232,255,.30)');
     gradA.addColorStop(.6, 'rgba(56,232,255,.06)');
     gradA.addColorStop(1, 'rgba(56,232,255,0)');
     ctx.fillStyle = gradA;
-    ctx.beginPath();
-    smooth(ctx, pa);
+    ctx.beginPath(); smooth(ctx, pa);
     ctx.lineTo(pa[pa.length - 1].x, m.t + ih);
     ctx.lineTo(pa[0].x, m.t + ih);
-    ctx.closePath();
-    ctx.fill();
+    ctx.closePath(); ctx.fill();
 
-    // 正课线（主色 #38e8ff）
     ctx.strokeStyle = '#38e8ff';
-    ctx.lineWidth = 2.4;
+    ctx.lineWidth = 2.2;
     ctx.lineJoin = 'round';
     ctx.shadowColor = '#38e8ff';
     ctx.shadowBlur = 12;
-    ctx.beginPath();
-    smooth(ctx, pa);
-    ctx.stroke();
+    ctx.beginPath(); smooth(ctx, pa); ctx.stroke();
 
-    // 体验课线（琥珀色）
     ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.8;
     ctx.shadowColor = '#fbbf24';
     ctx.shadowBlur = 10;
-    ctx.beginPath();
-    smooth(ctx, pb);
-    ctx.stroke();
+    ctx.beginPath(); smooth(ctx, pb); ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // 数据点
     ctx.fillStyle = '#38e8ff';
-    pa.forEach(function (pt) { ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.8, 0, Math.PI * 2); ctx.fill(); });
+    pa.forEach(function (pt) { ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.4, 0, Math.PI * 2); ctx.fill(); });
     ctx.fillStyle = '#fbbf24';
-    pb.forEach(function (pt) { ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.6, 0, Math.PI * 2); ctx.fill(); });
+    pb.forEach(function (pt) { ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.2, 0, Math.PI * 2); ctx.fill(); });
     ctx.restore();
+
+    if (pa.length) {
+      ctx.font = '10px Consolas, monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillStyle = '#7dd3fc';
+      ctx.fillText(Math.round(sa[sa.length - 1]) + 'h', w - m.r, m.t + 8);
+    }
   });
 
   /* ---------- 区域在线 ---------- */
@@ -1056,6 +1018,94 @@
     });
   }
 
+  /* ---------- 全国校区分布地图 ---------- */
+  var PROV_FULL = {
+    '北京': '北京市', '天津': '天津市', '河北': '河北省', '山西': '山西省',
+    '内蒙古': '内蒙古自治区', '辽宁': '辽宁省', '吉林': '吉林省', '黑龙江': '黑龙江省',
+    '上海': '上海市', '江苏': '江苏省', '浙江': '浙江省', '安徽': '安徽省',
+    '福建': '福建省', '江西': '江西省', '山东': '山东省', '河南': '河南省',
+    '湖北': '湖北省', '湖南': '湖南省', '广东': '广东省', '广西': '广西壮族自治区',
+    '海南': '海南省', '重庆': '重庆市', '四川': '四川省', '贵州': '贵州省',
+    '云南': '云南省', '西藏': '西藏自治区', '陕西': '陕西省', '甘肃': '甘肃省',
+    '青海': '青海省', '宁夏': '宁夏回族自治区', '新疆': '新疆维吾尔自治区',
+    '台湾': '台湾省', '香港': '香港特别行政区', '澳门': '澳门特别行政区'
+  };
+  var mapChart = null;
+  var geoReady = false;
+
+  function initMap() {
+    var el = $('mapChart');
+    if (!el || !window.echarts) return;
+    mapChart = echarts.init(el);
+    fetch('vendor/china.json')
+      .then(function (res) { return res.json(); })
+      .then(function (geo) {
+        echarts.registerMap('china', geo);
+        geoReady = true;
+        updateMap();
+      })
+      .catch(function (err) {
+        console.error('[map] china.json load failed:', err);
+        el.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#527ea8;font-size:12px">地图资源加载失败</div>';
+      });
+    window.addEventListener('resize', function () { if (mapChart) mapChart.resize(); });
+  }
+
+  function updateMap() {
+    if (!mapChart || !geoReady) return;
+    var sm = DATA.schoolMap || {};
+    var list = sm.provinces || [];
+    var data = list.map(function (d) {
+      return { name: PROV_FULL[d.name] || d.name, value: d.value };
+    });
+    var maxV = 1;
+    data.forEach(function (d) { if (d.value > maxV) maxV = d.value; });
+
+    mapChart.setOption({
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: 'rgba(6,26,54,.94)',
+        borderColor: 'rgba(56,216,255,.35)',
+        textStyle: { color: '#d9efff', fontSize: 12 },
+        formatter: function (pr) {
+          var v = Number(pr.value);
+          return pr.name + '<br/>' + (isNaN(v) || pr.value == null ? '暂无校区' : '校区 ' + v + ' 个');
+        }
+      },
+      visualMap: {
+        show: true, min: 0, max: maxV, left: 20, bottom: 46,
+        orient: 'horizontal', itemWidth: 74, itemHeight: 8, calculable: false,
+        text: ['多', '少'], textStyle: { color: '#7fa6c9', fontSize: 10 },
+        inRange: { color: ['#0a2a4d', '#12508a', '#1d8fd1', '#38d8ff'] }
+      },
+      series: [{
+        type: 'map', map: 'china', roam: false, zoom: 1.02,
+        layoutCenter: ['50%', '52%'], layoutSize: '104%',
+        label: { show: false },
+        itemStyle: {
+          areaColor: '#08203c',
+          borderColor: 'rgba(56,216,255,.32)',
+          borderWidth: 0.7
+        },
+        emphasis: {
+          label: { show: true, color: '#eaf8ff', fontSize: 11 },
+          itemStyle: { areaColor: '#1d6dff', borderColor: '#7dd3fc', borderWidth: 1 }
+        },
+        select: { disabled: true },
+        data: data
+      }]
+    }, true);
+
+    var stat = $('mapStat');
+    if (stat) {
+      stat.innerHTML =
+        '<span><b>' + Number(sm.total || 0).toLocaleString('en-US') + '</b>校区总数</span>' +
+        '<span><b>' + list.length + '</b>覆盖省份</span>' +
+        '<span><b>' + Number(sm.unknown || 0).toLocaleString('en-US') + '</b>归属未知</span>';
+    }
+  }
+
   /* ---------- 初始化 + 数据拉取 ---------- */
   buildRank('rankList', DATA.rank);
   buildRank('teacherRankList', DATA.teacherRank);
@@ -1063,6 +1113,7 @@
   buildDonutLegend();
   buildCore();
   buildEvents();
+  initMap();
   requestAnimationFrame(loop);
 
   function loadData() {
@@ -1082,6 +1133,7 @@
         buildDonutLegend();
         buildCore();
         buildEvents();
+        updateMap();
         var t = new Date(payload.updatedAt || Date.now());
         $('syncText').textContent = (payload.source === 'db' ? '数据库实时' : '演示数据') +
           ' · ' + pad2(t.getHours()) + ':' + pad2(t.getMinutes()) + ':' + pad2(t.getSeconds());

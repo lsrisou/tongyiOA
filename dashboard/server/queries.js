@@ -1,6 +1,7 @@
 'use strict';
 
 const demo = require('./demo');
+const { provinceOf } = require('./phonearea');
 
 // 支持两种注入方式：
 // 1) DASH_CONFIG：单个 JSON 变量，包含数据库与跳板机连接信息（推荐，规避环境变量数量限制）
@@ -522,6 +523,32 @@ async function loadWeeklyLessons(connection) {
   };
 }
 
+/** 中2：全国校区分布（按校长的手机号归属地省份聚合） */
+async function loadSchoolMap(connection) {
+  const [rows] = await connection.query(
+    'SELECT u.school_id, MIN(u.username) AS username ' +
+    'FROM de_admin_users u ' +
+    'JOIN de_schools s ON s.id = u.school_id ' +
+    "WHERE u.role_id = 'school_headmaster' AND u.school_id <> 0 " +
+    'AND u.deleted_at IS NULL AND s.deleted_at IS NULL ' +
+    'GROUP BY u.school_id'
+  );
+  const counts = {};
+  let unknown = 0;
+  rows.forEach(function (r) {
+    const p = provinceOf(r.username);
+    if (!p) {
+      unknown += 1;
+      return;
+    }
+    counts[p] = (counts[p] || 0) + 1;
+  });
+  const provinces = Object.keys(counts)
+    .map(function (name) { return { name: name, value: counts[name] }; })
+    .sort(function (a, b) { return b.value - a.value; });
+  return { total: rows.length, unknown: unknown, provinces: provinces };
+}
+
 async function loadMetrics() {
   if (!DB.host) return demo();
 
@@ -578,6 +605,11 @@ async function loadMetrics() {
       data.core = await loadCore(db);
     } catch (cErr) {
       console.error('[db] core query failed:', cErr.message);
+    }
+    try {
+      data.schoolMap = await loadSchoolMap(db);
+    } catch (mapErr) {
+      console.error('[db] school-map query failed:', mapErr.message);
     }
     data.source = 'db';
     data.updatedAt = new Date().toISOString();

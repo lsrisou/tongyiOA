@@ -92,7 +92,23 @@ function demo() {
       { name: '今日正课进度', value: '385.0', unit: ' h', percent: 89 },
       { name: '充值达成率', value: '¥19,764', unit: '', percent: 12 }
     ],
-    events: []
+    events: [],
+    schoolMap: {
+      total: 6341,
+      unknown: 35,
+      provinces: [
+        { name: '四川', value: 619 }, { name: '湖北', value: 573 },
+        { name: '江西', value: 549 }, { name: '浙江', value: 526 },
+        { name: '湖南', value: 509 }, { name: '江苏', value: 319 },
+        { name: '新疆', value: 309 }, { name: '山东', value: 301 },
+        { name: '北京', value: 290 }, { name: '河北', value: 270 },
+        { name: '内蒙古', value: 252 }, { name: '广东', value: 242 },
+        { name: '河南', value: 206 }, { name: '贵州', value: 138 },
+        { name: '福建', value: 136 }, { name: '甘肃', value: 118 },
+        { name: '陕西', value: 117 }, { name: '重庆', value: 111 },
+        { name: '天津', value: 109 }, { name: '上海', value: 107 }
+      ]
+    }
   };
 }
 

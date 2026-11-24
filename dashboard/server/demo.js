@@ -110,7 +110,7 @@ function demo() {
       ]
     },
     popStats: {
-      student: { total: 20614, todayNew: 181 },
+      student: { total: 25102, todayNew: 31 },
       school:  { total: 6155,  todayNew: 13 },
       dean:    { total: 2182,  todayNew: 1 },
       teacher: { total: 16898, todayNew: 3 }

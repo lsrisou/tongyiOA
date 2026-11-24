@@ -554,12 +554,11 @@ async function loadSchoolMap(connection) {
 
 /** 中下2：4 张人口统计卡（学生/校区/教务/教练，总数 + 今日新增） */
 async function loadPopStats(connection) {
-  // 学生：有过课时记录的 distinct student_id
+  // 学生：de_students 有效学生
   const [st] = await connection.query(
-    "SELECT COUNT(DISTINCT student_id) total, " +
-    "COUNT(DISTINCT CASE WHEN created_at >= CURDATE() AND deleted_at IS NULL THEN student_id END) today_new " +
-    "FROM de_student_hour_lessons " +
-    "WHERE student_id > 0 AND deleted_at IS NULL"
+    "SELECT COUNT(*) total, " +
+    "SUM(created_at >= CURDATE()) today_new " +
+    "FROM de_students WHERE deleted_at IS NULL"
   );
   // 校区：company_id=0 直营
   const [sc] = await connection.query(

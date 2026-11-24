@@ -181,20 +181,18 @@
   .mini-stats .bar{height:6px;border-radius:4px;background:rgba(80,150,230,.14);overflow:hidden;margin-top:-4px}
   .mini-stats .bar i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#1d6dff,#38e8ff)}
 
-  .pop-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;height:100%;align-content:center}
+  .pop-grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:12px;height:100%;align-content:center}
   .pop-card{background:linear-gradient(135deg,rgba(29,109,255,.12),rgba(56,216,255,.06));
-    border:1px solid rgba(56,216,255,.2);border-radius:4px;padding:12px 14px 10px;position:relative;overflow:hidden}
+    border:1px solid rgba(56,216,255,.2);border-radius:4px;padding:10px 14px;
+    position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
   .pop-card::before{content:"";position:absolute;right:-18px;top:-18px;width:52px;height:52px;border-radius:50%;
     background:radial-gradient(circle,rgba(56,216,255,.28),transparent 65%);pointer-events:none}
-  .pop-card .lb{font-size:11px;color:#7fb6db;letter-spacing:.08em}
-  .pop-card .val{font-family:"DIN Alternate",Consolas,monospace;font-size:26px;color:#f0fbff;font-weight:700;
-    text-shadow:0 0 14px rgba(56,216,255,.35);line-height:1;margin-top:4px;letter-spacing:-.5px}
-  .pop-card .tag{display:inline-flex;align-items:center;gap:4px;margin-top:8px;padding:2px 8px;border-radius:10px;
-    font-size:11px;color:#86efac;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35)}
+  .pop-card .lb{font-size:11px;line-height:1;color:#7fb6db;letter-spacing:.08em}
+  .pop-card .val{font-family:"DIN Alternate",Consolas,monospace;font-size:22px;color:#f0fbff;font-weight:700;
+    text-shadow:0 0 14px rgba(56,189,248,.35);line-height:1;margin-top:5px;letter-spacing:-.5px}
+  .pop-card .tag{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;margin-top:7px;padding:2px 9px;border-radius:10px;
+    font-size:10px;line-height:1.3;color:#86efac;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35)}
   .pop-card .tag b{font-family:"DIN Alternate",Consolas,monospace;color:#86efac;font-weight:700}
-  .pop-card .bar{height:4px;border-radius:2px;background:rgba(80,150,230,.18);overflow:hidden;margin-top:10px}
-  .pop-card .bar i{display:block;height:100%;width:0;border-radius:2px;background:linear-gradient(90deg,#1d6dff,#38e8ff);
-    box-shadow:0 0 6px rgba(56,216,255,.55)}
   .pop-card.alt{background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(168,85,247,.05));border-color:rgba(168,85,247,.25)}
   .pop-card.alt::before{background:radial-gradient(circle,rgba(168,85,247,.28),transparent 65%)}
   .pop-card.amber{background:linear-gradient(135deg,rgba(251,146,60,.1),rgba(251,191,36,.05));border-color:rgba(251,191,36,.25)}
@@ -770,12 +768,10 @@
       { lb: '教练人数', v: d.teacher.total, n: d.teacher.todayNew, cls: 'rose' }
     ];
     box.innerHTML = cards.map(function (c) {
-      var ratio = c.v ? Math.min(c.n / c.v * 100, 100) : 0;
       return '<div class="pop-card ' + c.cls + '">' +
         '<div class="lb">' + c.lb + '</div>' +
         '<div class="val">' + c.v.toLocaleString('en-US') + '</div>' +
         '<div class="tag"><span>今日新增</span><b>+' + c.n + '</b></div>' +
-        '<div class="bar"><i style="width:' + ratio + '%"></i></div>' +
       '</div>';
     }).join('');
     box._rendered = true;

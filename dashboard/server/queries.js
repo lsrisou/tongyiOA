@@ -304,7 +304,10 @@ async function collect(connection, period) {
  */
 async function loadWeeklyLessons(connection) {
   const [rows] = await connection.query(
-    "SELECT FROM_UNIXTIME(start_time,'%m-%d') AS d, " +
+    "SELECT CONCAT(FROM_UNIXTIME(start_time,'%m-%d'), ' ', " +
+    "CASE DAYOFWEEK(FROM_UNIXTIME(start_time)) " +
+    "WHEN 2 THEN '周一' WHEN 3 THEN '周二' WHEN 4 THEN '周三' WHEN 5 THEN '周四' " +
+    "WHEN 6 THEN '周五' WHEN 7 THEN '周六' WHEN 1 THEN '周日' END) AS d, " +
     "SUM(CASE WHEN trial_lesson_id = 0 THEN hour_count ELSE 0 END) AS regular_h, " +
     "SUM(CASE WHEN trial_lesson_id <> 0 THEN hour_count ELSE 0 END) AS trial_h " +
     "FROM de_student_hour_lessons " +

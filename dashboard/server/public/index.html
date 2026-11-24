@@ -161,17 +161,24 @@
   .ev-track{display:flex;flex-direction:column;gap:8px;animation:evScroll 48s linear infinite;will-change:transform}
   .events:hover .ev-track{animation-play-state:paused}
   @keyframes evScroll{from{transform:translateY(0)}to{transform:translateY(-50%)}}
-  .ev{display:flex;gap:8px;align-items:center;font-size:12px;line-height:1.3;height:20px;flex:none;animation:evIn .5s ease both}
+  .ev{display:flex;gap:8px;align-items:center;font-size:12px;line-height:1.3;height:20px;flex:none;min-width:0;overflow:hidden;animation:evIn .5s ease both}
   .ev .t{flex:none;width:38px;font-family:Consolas,monospace;font-size:11px;color:#4f7ba3}
   .ev .d{flex:none;width:6px;height:6px;border-radius:50%;box-shadow:0 0 8px currentColor}
-  .ev .m{flex:1;color:#a9c9e4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ev .m em.who{font-style:normal;color:#7dd3fc}
+  .ev .m{flex:1;color:#a9c9e4;overflow:hidden;white-space:nowrap;position:relative;min-width:0}
+  .ev .m .who{font-style:normal;color:#7dd3fc}
   .ev .m .role{color:#5b82a6;margin-right:4px}
   .ev .m .tail{color:#4f7ba6;margin:0 4px}
   .ev .m .tail .tgt{color:#8ab4d8}
   .ev .m .tail .sch{color:#9bbfe0}
   .ev .m .act{color:#a9c9e4}
   .ev .m .diff{color:#fbbf24;margin-left:4px;text-shadow:0 0 8px rgba(251,191,36,.35)}
+  .ev .m.marquee{animation:evMarquee var(--m-dur,12s) linear infinite;animation-delay:var(--m-delay,0s)}
+  @keyframes evMarquee{
+    0%{transform:translateX(0)}
+    1%{transform:translateX(0)}
+    98%{transform:translateX(var(--m-distance,0px))}
+    100%{transform:translateX(var(--m-distance,0px))}
+  }
   @keyframes evIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
 
   .ai-list{display:flex;flex-direction:column;justify-content:space-around;height:100%}
@@ -313,6 +320,7 @@
   function fit() {
     var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
     screenEl.style.transform = 'scale(' + s + ')';
+    requestAnimationFrame(applyMarquee);
   }
   window.addEventListener('resize', fit);
   fit();
@@ -1008,6 +1016,29 @@
       });
     }
     wrap.appendChild(track);
+    // 跑马灯：单行溢出时横向滚动
+    requestAnimationFrame(applyMarquee);
+  }
+
+  function applyMarquee() {
+    var items = document.querySelectorAll('#eventList .ev .m');
+    items.forEach(function (el, idx) {
+      var overflow = el.scrollWidth - el.clientWidth;
+      // 先清掉旧的 marquee 状态（数据刷新或窗口 resize 后）
+      el.classList.remove('marquee');
+      if (overflow > 4) {
+        var dur = Math.max(6, Math.min(22, overflow / 14)); // 约 14px/s，6~22s
+        var delay = (idx % 6) * 0.4; // 错开启动，避免整体同步
+        el.style.setProperty('--m-distance', '-' + overflow + 'px');
+        el.style.setProperty('--m-dur', dur + 's');
+        el.style.setProperty('--m-delay', delay + 's');
+        el.classList.add('marquee');
+      } else {
+        el.style.removeProperty('--m-distance');
+        el.style.removeProperty('--m-dur');
+        el.style.removeProperty('--m-delay');
+      }
+    });
   }
 
   /* ---------- 初始化 + 数据拉取 ---------- */

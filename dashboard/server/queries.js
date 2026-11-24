@@ -170,19 +170,19 @@ const TEACH_LEVELS = {
 };
 
 const ROLE_LABELS = {
+  school_pre_teacher: '预备教练',
   school_dean: '教务',
   school_headmaster: '校长',
+  school_premaster: '预备校长',
   school_deputymaster: '副校长',
-  top_manager: '运营总监',
+  top_manager: '总部管理员',
   top_dean: '教务督导',
   top_treasurer: '财务督导',
   school_salesman: '课程顾问',
-  school_pre_teacher: '预教练',
   school_pre_master: '预备校长',
   school_counsellor: '学习顾问',
   school_treasurer: '财务',
   school_promoter: '市场',
-  school_premaster: '预备校长',
   company_manager: '公司管理员'
 };
 

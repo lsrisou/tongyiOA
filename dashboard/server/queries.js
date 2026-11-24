@@ -308,6 +308,7 @@ async function loadLevelHours(connection) {
     "FROM de_student_hour_lessons l " +
     "JOIN de_admin_users u ON u.id = l.teacher_id " +
     "WHERE l.start_time >= UNIX_TIMESTAMP(CURDATE()) " +
+    "AND l.start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) " +
     "AND l.deleted_at IS NULL " +
     "GROUP BY u.teach_level " +
     "ORDER BY h DESC"
@@ -319,6 +320,165 @@ async function loadLevelHours(connection) {
     return { name: levelNames[Number(r.teach_level)] || ('等级' + r.teach_level),
              value: Number(r.h) || 0 };
   }).filter(function (d) { return d.value > 0; });
+}
+
+/** 左2：今日教练课时 TOP 6 */
+async function loadRank(connection) {
+  const [rows] = await connection.query(
+    'SELECT u.name AS name, ROUND(SUM(l.hour_count), 1) AS h ' +
+    'FROM de_student_hour_lessons l ' +
+    'JOIN de_admin_users u ON u.id = l.teacher_id ' +
+    'WHERE l.start_time >= UNIX_TIMESTAMP(CURDATE()) ' +
+    'AND l.start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) ' +
+    'AND l.deleted_at IS NULL ' +
+    'GROUP BY l.teacher_id ' +
+    'ORDER BY h DESC LIMIT 6'
+  );
+  return rows.map(function (r) {
+    return { name: r.name || '未知', value: Number(r.h) || 0 };
+  });
+}
+
+/** 左3：教练利用率 / 满荷率 / 今日进度（3 个圆环 0~100） */
+async function loadLoad(connection) {
+  const [todayT] = await connection.query(
+    'SELECT COUNT(DISTINCT teacher_id) AS value FROM de_student_hour_lessons ' +
+    'WHERE start_time >= UNIX_TIMESTAMP(CURDATE()) ' +
+    'AND start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) ' +
+    'AND deleted_at IS NULL'
+  );
+  const todayTeachers = Number(todayT[0].value) || 0;
+  const [totalT] = await connection.query(
+    "SELECT COUNT(*) AS value FROM de_admin_users WHERE role_id = 'school_teacher' AND deleted_at IS NULL"
+  );
+  const totalTeachers = Number(totalT[0].value) || 1;
+  const util = Math.round(todayTeachers * 100 / totalTeachers);
+
+  const [fullT] = await connection.query(
+    'SELECT COUNT(*) AS value FROM (' +
+    '  SELECT teacher_id FROM de_student_hour_lessons ' +
+    '  WHERE start_time >= UNIX_TIMESTAMP(CURDATE()) ' +
+    '  AND start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) ' +
+    '  AND deleted_at IS NULL ' +
+    '  GROUP BY teacher_id HAVING SUM(hour_count) >= 4' +
+    ') t'
+  );
+  const fullHour = Number(fullT[0].value) || 0;
+  const fullRate = todayTeachers ? Math.round(fullHour * 100 / todayTeachers) : 0;
+
+  const [yestH] = await connection.query(
+    'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
+    'WHERE deleted_at IS NULL AND trial_lesson_id = 0 ' +
+    'AND start_time >= UNIX_TIMESTAMP(CURDATE() - INTERVAL 1 DAY) ' +
+    'AND start_time <  UNIX_TIMESTAMP(CURDATE())'
+  );
+  const [todayH] = await connection.query(
+    'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
+    'WHERE deleted_at IS NULL AND trial_lesson_id = 0 ' +
+    'AND start_time >= UNIX_TIMESTAMP(CURDATE()) ' +
+    'AND start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY)'
+  );
+  const yestReg = Number(yestH[0].value) || 1;
+  const todayReg = Number(todayH[0].value) || 0;
+  const progress = Math.round(Math.min(100, todayReg * 100 / yestReg));
+
+  return [
+    { name: '教练利用率', value: util },
+    { name: '教练满荷率', value: fullRate },
+    { name: '今日课时进度', value: progress }
+  ];
+}
+
+/** 中下2：今日订单渠道占比（条形图，0~100 百分比） */
+async function loadRegion(connection) {
+  const TYPE_NAMES = {
+    school_point_charge: '校区充值',
+    hour_contract: '课程包签约',
+    trial_lesson: '体验课支付',
+    school_goods: '校区商品',
+    school_class: '班级报名',
+    teacher_reward: '教练奖励'
+  };
+  const [rows] = await connection.query(
+    'SELECT type_id, ROUND(SUM(price) / 100, 0) AS amt ' +
+    'FROM de_orders ' +
+    'WHERE deleted_at IS NULL AND state = 2 AND DATE(created_at) = CURDATE() ' +
+    'GROUP BY type_id ' +
+    'ORDER BY amt DESC'
+  );
+  const total = rows.reduce(function (s, r) { return s + Number(r.amt); }, 0) || 1;
+  return rows.map(function (r) {
+    return {
+      name: TYPE_NAMES[r.type_id] || String(r.type_id),
+      value: Math.round(Number(r.amt) * 100 / total)
+    };
+  });
+}
+
+/** 中下1：今日核心运营指标（mini-stats 4 项） */
+async function loadCore(connection) {
+  const [todayT] = await connection.query(
+    'SELECT COUNT(DISTINCT teacher_id) AS value FROM de_student_hour_lessons ' +
+    'WHERE start_time >= UNIX_TIMESTAMP(CURDATE()) ' +
+    'AND start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) ' +
+    'AND deleted_at IS NULL'
+  );
+  const todayTeachers = Number(todayT[0].value) || 0;
+  const [totalT] = await connection.query(
+    "SELECT COUNT(*) AS value FROM de_admin_users WHERE role_id = 'school_teacher' AND deleted_at IS NULL"
+  );
+  const totalTeachers = Number(totalT[0].value) || 1;
+  const utilRate = Math.round(todayTeachers * 100 / totalTeachers);
+
+  const [fullT] = await connection.query(
+    'SELECT COUNT(*) AS value FROM (' +
+    '  SELECT teacher_id FROM de_student_hour_lessons ' +
+    '  WHERE start_time >= UNIX_TIMESTAMP(CURDATE()) ' +
+    '  AND start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) ' +
+    '  AND deleted_at IS NULL ' +
+    '  GROUP BY teacher_id HAVING SUM(hour_count) >= 4' +
+    ') t'
+  );
+  const fullHour = Number(fullT[0].value) || 0;
+  const fullRate = todayTeachers ? Math.round(fullHour * 100 / todayTeachers) : 0;
+
+  const [yestH] = await connection.query(
+    'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
+    'WHERE deleted_at IS NULL AND trial_lesson_id = 0 ' +
+    'AND start_time >= UNIX_TIMESTAMP(CURDATE() - INTERVAL 1 DAY) ' +
+    'AND start_time <  UNIX_TIMESTAMP(CURDATE())'
+  );
+  const [todayH] = await connection.query(
+    'SELECT COALESCE(SUM(hour_count), 0) AS value FROM de_student_hour_lessons ' +
+    'WHERE deleted_at IS NULL AND trial_lesson_id = 0 ' +
+    'AND start_time >= UNIX_TIMESTAMP(CURDATE()) ' +
+    'AND start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY)'
+  );
+  const yestReg = Number(yestH[0].value) || 1;
+  const todayReg = Number(todayH[0].value) || 0;
+  const progressRate = Math.round(Math.min(100, todayReg * 100 / yestReg));
+
+  const [charge] = await connection.query(
+    "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders " +
+    "WHERE deleted_at IS NULL AND state = 2 AND " +
+    "created_at >= CURDATE() - INTERVAL 6 DAY AND created_at < CURDATE() " +
+    "AND type_id = 'school_point_charge'"
+  );
+  const [todayCharge] = await connection.query(
+    "SELECT COALESCE(SUM(price), 0) / 100 AS value FROM de_orders " +
+    "WHERE deleted_at IS NULL AND state = 2 AND DATE(created_at) = CURDATE() " +
+    "AND type_id = 'school_point_charge'"
+  );
+  const avgCharge7 = Number(charge[0].value) / 7 || 1;
+  const todayChargeVal = Number(todayCharge[0].value) || 0;
+  const chargeRate = Math.round(Math.min(100, todayChargeVal * 100 / avgCharge7));
+
+  return [
+    { name: '教练利用率', value: todayTeachers.toLocaleString('en-US') + ' / ' + totalTeachers, unit: ' 人', percent: utilRate },
+    { name: '教练满荷率', value: fullHour + ' / ' + todayTeachers, unit: ' 人', percent: fullRate },
+    { name: '今日正课进度', value: todayReg.toFixed(1), unit: ' h', percent: progressRate },
+    { name: '充值达成率', value: '¥' + Math.round(todayChargeVal).toLocaleString('en-US'), unit: '', percent: chargeRate }
+  ];
 }
 
 async function loadWeeklyLessons(connection) {
@@ -374,6 +534,26 @@ async function loadMetrics() {
       data.channel = await loadLevelHours(db);
     } catch (chErr) {
       console.error('[db] level-hours query failed:', chErr.message);
+    }
+    try {
+      data.rank = await loadRank(db);
+    } catch (rErr) {
+      console.error('[db] rank query failed:', rErr.message);
+    }
+    try {
+      data.load = await loadLoad(db);
+    } catch (lErr) {
+      console.error('[db] load query failed:', lErr.message);
+    }
+    try {
+      data.region = await loadRegion(db);
+    } catch (regErr) {
+      console.error('[db] region query failed:', regErr.message);
+    }
+    try {
+      data.core = await loadCore(db);
+    } catch (cErr) {
+      console.error('[db] core query failed:', cErr.message);
     }
     data.source = 'db';
     data.updatedAt = new Date().toISOString();

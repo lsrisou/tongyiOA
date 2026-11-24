@@ -47,17 +47,18 @@ function demo() {
       trial:   [ 59.0,  52.0,  95.0,  347.0,  362.0,  73.0,  24.0]
     },
     region: [
-      { name: '华东', value: 92 }, { name: '华南', value: 78 },
-      { name: '华北', value: 66 }, { name: '西南', value: 54 },
-      { name: '华中', value: 41 }
+      { name: '校区充值', value: 90 }, { name: '课程包签约', value: 8 },
+      { name: '体验课支付', value: 2 }
     ],
     rank: [
-      { name: '计算机学院', value: 9820 }, { name: '人工智能学院', value: 8740 },
-      { name: '数学与统计学院', value: 7320 }, { name: '外国语学院', value: 6180 },
-      { name: '经济管理学院', value: 5240 }, { name: '艺术设计学院', value: 4310 }
+      { name: '王红莉', value: 71.5 }, { name: '华莉', value: 63.5 },
+      { name: '王智群', value: 62.0 }, { name: '任重伟', value: 60.5 },
+      { name: '韩晓媛', value: 60.5 }, { name: '张施瑶', value: 57.0 }
     ],
     load: [
-      { name: 'CPU', value: 62 }, { name: '内存', value: 78 }, { name: '带宽', value: 45 }
+      { name: '教练利用率', value: 11 },
+      { name: '教练满荷率', value: 48 },
+      { name: '今日课时进度', value: 89 }
     ],
     channel: [
       { name: '金牌教练', value: 5403.8 }, { name: '银牌教练', value: 3428.5 },
@@ -72,10 +73,10 @@ function demo() {
       { name: '内容生成', value: 61 }
     ],
     core: [
-      { name: '日均学习时长', value: '48.6', unit: ' min', percent: 82 },
-      { name: '课程资源总量', value: '12,480', unit: ' 门', percent: 68 },
-      { name: '师生互动次数', value: '86,320', unit: ' 次', percent: 74 },
-      { name: '智能推荐命中率', value: '93.2', unit: ' %', percent: 93 }
+      { name: '教练利用率', value: '1,917 / 16,885', unit: ' 人', percent: 11 },
+      { name: '教练满荷率', value: '921 / 1,917', unit: ' 人', percent: 48 },
+      { name: '今日正课进度', value: '385.0', unit: ' h', percent: 89 },
+      { name: '充值达成率', value: '¥19,764', unit: '', percent: 12 }
     ],
     events: []
   };

@@ -844,7 +844,7 @@
       row.innerHTML = '<span class="no">' + (i + 1) + '</span>' +
         '<span class="name" title="' + d.name + '">' + d.name + '</span>' +
         '<span class="track"><span class="fill"></span></span>' +
-        '<span class="num">' + Number(d.value || 0).toLocaleString('en-US') + '</span>';
+        '<span class="num">' + Number(d.value || 0).toLocaleString('en-US') + 'h</span>';
       wrap.appendChild(row);
     });
     setTimeout(function () {

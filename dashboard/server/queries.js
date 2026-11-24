@@ -322,18 +322,18 @@ async function loadLevelHours(connection) {
   }).filter(function (d) { return d.value > 0; });
 }
 
-/** 左2：今日校区课时排行 TOP 6 */
+/** 左2：今日授课校区课时排行 TOP 6（teach_school_id = 上课校区） */
 async function loadSchoolRank(connection) {
   const [rows] = await connection.query(
     'SELECT s.name AS name, ROUND(SUM(l.hour_count), 1) AS h ' +
     'FROM de_student_hour_lessons l ' +
-    'JOIN de_schools s ON s.id = l.school_id ' +
-    'WHERE l.school_id <> 0 ' +
+    'JOIN de_schools s ON s.id = l.teach_school_id ' +
+    'WHERE l.teach_school_id <> 0 ' +
     'AND s.deleted_at IS NULL ' +
     'AND l.start_time >= UNIX_TIMESTAMP(CURDATE()) ' +
     'AND l.start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) ' +
     'AND l.deleted_at IS NULL ' +
-    'GROUP BY l.school_id ' +
+    'GROUP BY l.teach_school_id ' +
     'ORDER BY h DESC LIMIT 6'
   );
   return rows.map(function (r) {

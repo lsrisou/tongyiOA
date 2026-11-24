@@ -142,6 +142,7 @@
   .rank .row:nth-child(2) .no{background:rgba(203,213,225,.14);color:#cbd5e1;border-color:rgba(203,213,225,.4)}
   .rank .row:nth-child(3) .no{background:rgba(251,146,60,.14);color:#fb923c;border-color:rgba(251,146,60,.4)}
   .rank .name{width:96px;flex:none;font-size:12px;color:#a9c9e4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rank .dept{font-style:normal;font-size:10px;color:#5f8cb8;margin-left:5px}
   .rank .track{flex:1;height:9px;border-radius:5px;background:rgba(80,150,230,.14);overflow:hidden;position:relative}
   .rank .fill{height:100%;width:0;border-radius:5px;
     background:linear-gradient(90deg,rgba(29,109,255,.55),#38d8ff);
@@ -844,7 +845,8 @@
       var row = document.createElement('div');
       row.className = 'row';
       row.innerHTML = '<span class="no">' + (i + 1) + '</span>' +
-        '<span class="name" title="' + d.name + '">' + d.name + '</span>' +
+        '<span class="name" title="' + d.name + (d.dean ? ' · ' + d.dean : '') + '">' + d.name +
+        (d.dean ? '<i class="dept">' + d.dean + '</i>' : '') + '</span>' +
         '<span class="track"><span class="fill"></span></span>' +
         '<span class="num">' + Number(d.value || 0).toLocaleString('en-US') + 'h</span>';
       wrap.appendChild(row);

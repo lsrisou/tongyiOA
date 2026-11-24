@@ -346,9 +346,10 @@ async function loadSchoolRank(connection) {
 /** 左3：今日教练课时 TOP 20 */
 async function loadTeacherRank(connection) {
   const [rows] = await connection.query(
-    'SELECT u.name AS name, ROUND(SUM(l.hour_count), 1) AS h ' +
+    'SELECT u.name AS name, MAX(d.name) AS dean, ROUND(SUM(l.hour_count), 1) AS h ' +
     'FROM de_student_hour_lessons l ' +
     'JOIN de_admin_users u ON u.id = l.teacher_id ' +
+    'LEFT JOIN de_admin_users d ON d.id = l.dean_id AND d.deleted_at IS NULL ' +
     'WHERE l.start_time >= UNIX_TIMESTAMP(CURDATE()) ' +
     'AND l.start_time <  UNIX_TIMESTAMP(CURDATE() + INTERVAL 1 DAY) ' +
     'AND l.deleted_at IS NULL AND u.deleted_at IS NULL ' +
@@ -356,7 +357,7 @@ async function loadTeacherRank(connection) {
     'ORDER BY h DESC LIMIT 20'
   );
   return rows.map(function (r) {
-    return { name: r.name || '未知', value: Number(r.h) || 0 };
+    return { name: r.name || '未知', dean: r.dean || '', value: Number(r.h) || 0 };
   });
 }
 

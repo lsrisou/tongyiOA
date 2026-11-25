@@ -587,11 +587,11 @@
         diff = (target - yv) / Number(yv) * 100;
       }
       if (yv == null) {
-        del.innerHTML = '<span class="yest">昨日 --</span>';
+        del.innerHTML = '<span class="yest">昨日同时刻 --</span>';
       } else {
         var momClass = diff == null || diff === 0 ? 'flat' : (diff > 0 ? 'up' : 'down');
         var momText = diff == null ? '—' : (diff >= 0 ? '+' : '') + diff.toFixed(1) + '%';
-        del.innerHTML = '<span class="yest">昨日 ' + formatNum(yv, d.dec) + (d.unit || '') + '</span>' +
+        del.innerHTML = '<span class="yest">昨日同时刻 ' + formatNum(yv, d.dec) + (d.unit || '') + '</span>' +
           '<span class="mom ' + momClass + '">环比 ' + momText + '</span>';
       }
     });
@@ -613,10 +613,10 @@
       if (Number(ycd.converted) !== 0) convDiff = (cd.converted - ycd.converted) / Number(ycd.converted) * 100;
       var momClass2 = convDiff == null || convDiff === 0 ? 'flat' : (convDiff > 0 ? 'up' : 'down');
       var momText2 = convDiff == null ? '—' : (convDiff >= 0 ? '+' : '') + convDiff.toFixed(1) + '%';
-      yDet.innerHTML = '<span class="yest">昨日 ' + Number(ycd.converted) + '/' + Number(ycd.total) + '</span>' +
+      yDet.innerHTML = '<span class="yest">昨日同时刻 ' + Number(ycd.converted) + '/' + Number(ycd.total) + '</span>' +
         '<span class="mom ' + momClass2 + '">环比 ' + momText2 + '</span>';
     } else {
-      yDet.innerHTML = '<span class="yest">昨日 --</span>';
+      yDet.innerHTML = '<span class="yest">昨日同时刻 --</span>';
     }
   }
   updateKpis(true);

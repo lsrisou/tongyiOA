@@ -38,11 +38,11 @@ const SSH = CONF.ssh;
 
 const TODAY_PERIOD = {
   start: 'CURDATE()',
-  end: 'CURDATE() + INTERVAL 1 DAY'
+  end: 'NOW()'
 };
 const YESTERDAY_PERIOD = {
   start: 'CURDATE() - INTERVAL 1 DAY',
-  end: 'CURDATE()'
+  end: 'NOW() - INTERVAL 1 DAY'
 };
 
 function periodWhere(field, p) {

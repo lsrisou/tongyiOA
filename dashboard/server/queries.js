@@ -44,6 +44,10 @@ const YESTERDAY_PERIOD = {
   start: 'CURDATE() - INTERVAL 1 DAY',
   end: 'NOW() - INTERVAL 1 DAY'
 };
+const YESTERDAY_FULL_PERIOD = {
+  start: 'CURDATE() - INTERVAL 1 DAY',
+  end: 'CURDATE()'
+};
 
 function periodWhere(field, p) {
   // start_time 是 bigint 时间戳，其余（finished_at/updated_at/created_at）是 datetime
@@ -594,6 +598,7 @@ async function loadMetrics() {
     const db = await getConnection();
     const today = await collect(db, TODAY_PERIOD);
     const yesterday = await collect(db, YESTERDAY_PERIOD);
+    const yesterdayFull = await collect(db, YESTERDAY_FULL_PERIOD);
 
     const data = demo();
     data.kpis.trialHours = today.trialHours;
@@ -603,6 +608,7 @@ async function loadMetrics() {
     data.kpis.trialPayAmount = today.trialPayAmount;
     data.kpis.conversionDetail = today.conversionDetail;
     data.yesterday = yesterday;
+    data.yesterdayFull = yesterdayFull;
     try {
       data.events = await loadEvents(db);
     } catch (eventErr) {

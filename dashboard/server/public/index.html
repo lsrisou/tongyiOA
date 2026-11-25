@@ -126,8 +126,9 @@
   .kpi .val.fraction small{font-size:18px;color:#4ade80;margin:0 5px;text-shadow:0 0 14px rgba(74,222,128,.45)}
   .kpi .val.fraction #kpiConvDen{color:#94a3b8;text-shadow:0 0 10px rgba(148,163,184,.25)}
   .kpi .delta{font-size:11px;letter-spacing:.03em;color:#7fa6c9;white-space:nowrap;overflow:visible;text-overflow:clip;flex:none}
-  .kpi .delta .yest{display:block;line-height:1.35;color:#4ade80}
-  .kpi .delta .mom{display:block;line-height:1.35}
+  .kpi .delta .yest{display:block;line-height:1.25;color:#4ade80}
+  .kpi .delta .yest-full{display:block;line-height:1.25;color:#60a5fa}
+  .kpi .delta .mom{display:block;line-height:1.25}
   .kpi .delta .mom.up{color:#4ade80}
   .kpi .delta .mom.down{color:#f87171}
   .kpi .delta .mom.flat{color:#7fa6c9}
@@ -458,6 +459,14 @@
       trialPayAmount: 2150.00,
       conversionDetail: { converted: 14, total: 96 }
     },
+    yesterdayFull: {
+      trialHours: 41.0,
+      regularHours: 302.5,
+      conversionRate: 14.6,
+      schoolChargeAmount: 38600.00,
+      trialPayAmount: 2150.00,
+      conversionDetail: { converted: 14, total: 96 }
+    },
     trend: {
       labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
       learners: [8200, 9100, 8600, 10400, 11200, 12600, 11800],
@@ -581,19 +590,20 @@
 
       var del = $(d.deltaEl);
       var y = DATA.yesterday || {};
+      var yf = DATA.yesterdayFull || {};
       var yv = y[d.key];
+      var yfv = yf[d.key];
       var diff = null;
       if (yv != null && Number(yv) !== 0) {
         diff = (target - yv) / Number(yv) * 100;
       }
-      if (yv == null) {
-        del.innerHTML = '<span class="yest">昨日同时刻 --</span>';
-      } else {
-        var momClass = diff == null || diff === 0 ? 'flat' : (diff > 0 ? 'up' : 'down');
-        var momText = diff == null ? '—' : (diff >= 0 ? '+' : '') + diff.toFixed(1) + '%';
-        del.innerHTML = '<span class="yest">昨日同时刻 ' + formatNum(yv, d.dec) + (d.unit || '') + '</span>' +
-          '<span class="mom ' + momClass + '">环比 ' + momText + '</span>';
-      }
+      var momClass = diff == null || diff === 0 ? 'flat' : (diff > 0 ? 'up' : 'down');
+      var momText = diff == null ? '—' : (diff >= 0 ? '+' : '') + diff.toFixed(1) + '%';
+      var sameText = yv == null ? '--' : formatNum(yv, d.dec) + (d.unit || '');
+      var fullText = yfv == null ? '--' : formatNum(yfv, d.dec) + (d.unit || '');
+      del.innerHTML = '<span class="yest">昨日同时刻 ' + sameText + '</span>' +
+        '<span class="yest-full">昨日全天 ' + fullText + '</span>' +
+        '<span class="mom ' + momClass + '">环比 ' + momText + '</span>';
     });
 
     // 独立处理：学生转化率卡片显示分数（converted / total）
@@ -608,16 +618,16 @@
       }, 600);
     }
     var yDet = $('deltaConversionRate');
-    if (ycd && (ycd.converted || ycd.total)) {
-      var convDiff = null;
-      if (Number(ycd.converted) !== 0) convDiff = (cd.converted - ycd.converted) / Number(ycd.converted) * 100;
-      var momClass2 = convDiff == null || convDiff === 0 ? 'flat' : (convDiff > 0 ? 'up' : 'down');
-      var momText2 = convDiff == null ? '—' : (convDiff >= 0 ? '+' : '') + convDiff.toFixed(1) + '%';
-      yDet.innerHTML = '<span class="yest">昨日同时刻 ' + Number(ycd.converted) + '/' + Number(ycd.total) + '</span>' +
-        '<span class="mom ' + momClass2 + '">环比 ' + momText2 + '</span>';
-    } else {
-      yDet.innerHTML = '<span class="yest">昨日同时刻 --</span>';
-    }
+    var yfcd = (DATA.yesterdayFull || {}).conversionDetail || null;
+    var convDiff = null;
+    if (ycd && Number(ycd.converted) !== 0) convDiff = (cd.converted - ycd.converted) / Number(ycd.converted) * 100;
+    var momClass2 = convDiff == null || convDiff === 0 ? 'flat' : (convDiff > 0 ? 'up' : 'down');
+    var momText2 = convDiff == null ? '—' : (convDiff >= 0 ? '+' : '') + convDiff.toFixed(1) + '%';
+    var sameConvText = ycd ? Number(ycd.converted) + '/' + Number(ycd.total) : '--';
+    var fullConvText = yfcd ? Number(yfcd.converted) + '/' + Number(yfcd.total) : '--';
+    yDet.innerHTML = '<span class="yest">昨日同时刻 ' + sameConvText + '</span>' +
+      '<span class="yest-full">昨日全天 ' + fullConvText + '</span>' +
+      '<span class="mom ' + momClass2 + '">环比 ' + momText2 + '</span>';
   }
   updateKpis(true);
 

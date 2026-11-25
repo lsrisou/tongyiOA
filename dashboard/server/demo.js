@@ -35,6 +35,14 @@ function demo() {
       trialPayAmount: 2150.00,
       conversionDetail: { converted: 14, total: 96 }
     },
+    yesterdayFull: {
+      trialHours: 41.0,
+      regularHours: 302.5,
+      conversionRate: 14.6,
+      schoolChargeAmount: 38600.00,
+      trialPayAmount: 2150.00,
+      conversionDetail: { converted: 14, total: 96 }
+    },
     trend: {
       labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
       learners: [8200, 9100, 8600, 10400, 11200, 12600, 11800],

@@ -602,8 +602,8 @@
       var sameText = yv == null ? '--' : formatNum(yv, d.dec) + (d.unit || '');
       var fullText = yfv == null ? '--' : formatNum(yfv, d.dec) + (d.unit || '');
       del.innerHTML = '<span class="yest">昨日同时刻 ' + sameText + '</span>' +
-        '<span class="yest-full">昨日全天 ' + fullText + '</span>' +
-        '<span class="mom ' + momClass + '">环比 ' + momText + '</span>';
+        '<span class="mom ' + momClass + '">环比 ' + momText + '</span>' +
+        '<span class="yest-full">昨日全天 ' + fullText + '</span>';
     });
 
     // 独立处理：学生转化率卡片显示分数（converted / total）
@@ -626,8 +626,8 @@
     var sameConvText = ycd ? Number(ycd.converted) + '/' + Number(ycd.total) : '--';
     var fullConvText = yfcd ? Number(yfcd.converted) + '/' + Number(yfcd.total) : '--';
     yDet.innerHTML = '<span class="yest">昨日同时刻 ' + sameConvText + '</span>' +
-      '<span class="yest-full">昨日全天 ' + fullConvText + '</span>' +
-      '<span class="mom ' + momClass2 + '">环比 ' + momText2 + '</span>';
+      '<span class="mom ' + momClass2 + '">环比 ' + momText2 + '</span>' +
+      '<span class="yest-full">昨日全天 ' + fullConvText + '</span>';
   }
   updateKpis(true);
 

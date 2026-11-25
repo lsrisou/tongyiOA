@@ -314,7 +314,7 @@
         </div>
 
         <div class="panel hero-chart">
-          <div class="ptitle"><h3>全国校区分布</h3><span class="sub">CAMPUS MAP · 校长手机号归属地</span></div>
+          <div class="ptitle"><h3>全国校区分布</h3><span class="sub" id="mapSub">3D CAMPUS MAP · 拖拽旋转 / 滚轮缩放</span></div>
           <div class="body">
             <div class="map-wrap">
               <div id="mapChart"></div>
@@ -368,6 +368,7 @@
 </div>
 
 <script src="vendor/echarts.min.js"></script>
+<script src="vendor/echarts-gl.min.js"></script>
 <script>
 (function () {
   'use strict';
@@ -1069,10 +1070,25 @@
   };
   var mapChart = null;
   var geoReady = false;
+  var map3DReady = false;
+  var map3DEnabled = false;
+
+  function supportsWebGL() {
+    try {
+      var canvas = document.createElement('canvas');
+      return !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+    } catch (e) {
+      return false;
+    }
+  }
 
   function initMap() {
     var el = $('mapChart');
     if (!el || !window.echarts) return;
+    map3DEnabled = supportsWebGL();
+    $('mapSub').textContent = map3DEnabled
+      ? '3D CAMPUS MAP · 拖拽旋转 / 滚轮缩放'
+      : '3D CAMPUS MAP · 立体展示兼容模式';
     mapChart = echarts.init(el);
     fetch('vendor/china.json')
       .then(function (res) { return res.json(); })
@@ -1096,9 +1112,15 @@
       return { name: PROV_FULL[d.name] || d.name, value: d.value };
     });
     var maxV = 1;
-    data.forEach(function (d) { if (d.value > maxV) maxV = d.value; });
+    data.forEach(function (d) {
+      if (d.value > maxV) maxV = d.value;
+    });
+    data.forEach(function (d) {
+      d.height = 1.8 + (Number(d.value || 0) / maxV) * 7.2;
+    });
 
-    mapChart.setOption({
+    if (map3DEnabled) {
+      var mapOption = {
       backgroundColor: 'transparent',
       tooltip: {
         trigger: 'item',
@@ -1114,25 +1136,47 @@
         show: true, min: 0, max: maxV, left: 20, bottom: 46,
         orient: 'horizontal', itemWidth: 74, itemHeight: 8, calculable: false,
         text: ['多', '少'], textStyle: { color: '#7fa6c9', fontSize: 10 },
-        inRange: { color: ['#0a2a4d', '#12508a', '#1d8fd1', '#38d8ff'] }
+        inRange: { color: ['#103c68', '#126fb3', '#20c5ec', '#9be9ff'] }
       },
       series: [{
-        type: 'map', map: 'china', roam: false, zoom: 1,
-        layoutCenter: ['50%', '56%'], layoutSize: '92%',
+        type: 'map3D', map: 'china', roam: true,
+        left: -5, right: -5, top: 0, bottom: 28,
+        boxWidth: 95, boxDepth: 80, regionHeight: 1.4,
+        shading: 'lambert',
+        viewControl: {
+          projection: 'perspective',
+          alpha: 52, beta: 0, distance: 145,
+          minDistance: 90, maxDistance: 220,
+          rotateSensitivity: 1, zoomSensitivity: 1, panSensitivity: 0.5,
+          autoRotate: false
+        },
+        light: {
+          main: { color: '#ffffff', intensity: 1.25, shadow: false, alpha: 45, beta: -35 },
+          ambient: { intensity: 0.42 }
+        },
         label: { show: false },
         itemStyle: {
-          areaColor: '#08203c',
-          borderColor: 'rgba(56,216,255,.32)',
-          borderWidth: 0.7
+          color: '#0b3158',
+          borderColor: 'rgba(56,216,255,.65)',
+          borderWidth: 0.8,
+          opacity: 1
         },
         emphasis: {
           label: { show: true, color: '#eaf8ff', fontSize: 11 },
-          itemStyle: { areaColor: '#1d6dff', borderColor: '#7dd3fc', borderWidth: 1 }
+          itemStyle: { color: '#1d6dff', borderColor: '#7dd3fc', borderWidth: 1.2 }
         },
-        select: { disabled: true },
         data: data
       }]
-    }, true);
+    };
+    if (!map3DReady) {
+      mapChart.setOption(mapOption, true);
+      map3DReady = true;
+    } else {
+      mapChart.setOption({ visualMap: { max: maxV }, series: [{ data: data }] });
+    }
+    } else {
+      updatePseudo3DMap(data, maxV);
+    }
 
     var stat = $('mapStat');
     if (stat) {
@@ -1154,6 +1198,66 @@
           '<b class="vv">' + Number(d.value).toLocaleString('en-US') + ' 个</b></div>';
       }).join('');
     }
+  }
+
+  function updatePseudo3DMap(data, maxV) {
+    function provinceColor(value) {
+      var t = Math.pow(Math.max(0, Math.min(1, Number(value || 0) / maxV)), 0.55);
+      var stops = [[18, 82, 138], [24, 145, 205], [48, 214, 244], [176, 244, 255]];
+      var scaled = t * 3;
+      var idx = Math.min(2, Math.floor(scaled));
+      var p = scaled - idx;
+      var rgb = stops[idx].map(function (v, i) {
+        return Math.round(v + (stops[idx + 1][i] - v) * p);
+      });
+      return 'rgb(' + rgb.join(',') + ')';
+    }
+    data.forEach(function (d) {
+      d.itemStyle = { areaColor: provinceColor(d.value) };
+    });
+    mapChart.setOption({
+      animation: false,
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: 'rgba(6,26,54,.94)',
+        borderColor: 'rgba(56,216,255,.35)',
+        textStyle: { color: '#d9efff', fontSize: 12 },
+        formatter: function (pr) {
+          var v = Number(pr.value);
+          return pr.name + '<br/>' + (isNaN(v) || pr.value == null ? '暂无校区' : '校区 ' + v + ' 个');
+        }
+      },
+      visualMap: {
+        show: true, min: 0, max: maxV, seriesIndex: [],
+        left: 20, bottom: 46, orient: 'horizontal',
+        itemWidth: 74, itemHeight: 8, calculable: false,
+        text: ['多', '少'], textStyle: { color: '#7fa6c9', fontSize: 10 },
+        inRange: { color: ['#12528a', '#1891cd', '#30d6f4', '#b0f4ff'] }
+      },
+      series: [{
+        type: 'map', map: 'china', roam: false,
+        aspectScale: 0.66,
+        layoutCenter: ['50%', '48%'], layoutSize: '88%',
+        label: { show: false },
+        itemStyle: {
+          areaColor: '#12528a',
+          borderColor: 'rgba(160,239,255,.88)',
+          borderWidth: 0.85,
+          shadowColor: 'rgba(3,40,75,.96)',
+          shadowBlur: 0,
+          shadowOffsetY: 11
+        },
+        emphasis: {
+          label: { show: true, color: '#ffffff', fontSize: 11 },
+          itemStyle: {
+            areaColor: '#38d8ff', borderColor: '#ffffff', borderWidth: 1.2,
+            shadowColor: 'rgba(56,216,255,.5)', shadowBlur: 12, shadowOffsetY: 8
+          }
+        },
+        data: data
+      }]
+    }, true);
   }
 
   /* ---------- 初始化 + 数据拉取 ---------- */

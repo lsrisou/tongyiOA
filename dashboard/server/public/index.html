@@ -119,14 +119,15 @@
     border:1px solid rgba(64,158,255,.22);border-radius:4px;overflow:hidden}
   .kpi::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:2px;
     background:linear-gradient(180deg,#3de6ff,#1d6dff);box-shadow:0 0 12px rgba(61,230,255,.8)}
-  .kpi .label{font-size:12px;letter-spacing:.14em;color:#7fa6c9}
-  .kpi .val{font-family:"DIN Alternate","Bahnschrift",Consolas,monospace;font-size:28px;font-weight:700;letter-spacing:.02em;
-    color:#f0fbff;text-shadow:0 0 20px rgba(56,189,248,.45);line-height:1.25}
-  .kpi .val small{font-size:15px;color:#7dd3fc;margin-left:3px;letter-spacing:.04em}
+  .kpi .label{font-size:12px;letter-spacing:.14em;color:#7fa6c9;flex:none}
+  .kpi .val{font-family:"DIN Alternate","Bahnschrift",Consolas,monospace;font-size:24px;font-weight:700;letter-spacing:.02em;
+    color:#f0fbff;text-shadow:0 0 20px rgba(56,189,248,.45);line-height:1.25;white-space:nowrap;flex:none}
+  .kpi .val small{font-size:13px;color:#7dd3fc;margin-left:3px;letter-spacing:.04em}
   .kpi .val.fraction small{font-size:18px;color:#4ade80;margin:0 5px;text-shadow:0 0 14px rgba(74,222,128,.45)}
   .kpi .val.fraction #kpiConvDen{color:#94a3b8;text-shadow:0 0 10px rgba(148,163,184,.25)}
-  .kpi .delta{font-size:11px;letter-spacing:.03em;color:#7fa6c9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .kpi .delta .yest{color:#4ade80}
+  .kpi .delta{font-size:11px;letter-spacing:.03em;color:#7fa6c9;white-space:nowrap;overflow:visible;text-overflow:clip;flex:none}
+  .kpi .delta .yest{display:block;line-height:1.35;color:#4ade80}
+  .kpi .delta .mom{display:block;line-height:1.35}
   .kpi .delta .mom.up{color:#4ade80}
   .kpi .delta .mom.down{color:#f87171}
   .kpi .delta .mom.flat{color:#7fa6c9}
@@ -591,7 +592,7 @@
         var momClass = diff == null || diff === 0 ? 'flat' : (diff > 0 ? 'up' : 'down');
         var momText = diff == null ? '—' : (diff >= 0 ? '+' : '') + diff.toFixed(1) + '%';
         del.innerHTML = '<span class="yest">昨日 ' + formatNum(yv, d.dec) + (d.unit || '') + '</span>' +
-          '<span class="mom ' + momClass + '"> · 环比 ' + momText + '</span>';
+          '<span class="mom ' + momClass + '">环比 ' + momText + '</span>';
       }
     });
 
@@ -613,7 +614,7 @@
       var momClass2 = convDiff == null || convDiff === 0 ? 'flat' : (convDiff > 0 ? 'up' : 'down');
       var momText2 = convDiff == null ? '—' : (convDiff >= 0 ? '+' : '') + convDiff.toFixed(1) + '%';
       yDet.innerHTML = '<span class="yest">昨日 ' + Number(ycd.converted) + '/' + Number(ycd.total) + '</span>' +
-        '<span class="mom ' + momClass2 + '"> · 环比 ' + momText2 + '</span>';
+        '<span class="mom ' + momClass2 + '">环比 ' + momText2 + '</span>';
     } else {
       yDet.innerHTML = '<span class="yest">昨日 --</span>';
     }

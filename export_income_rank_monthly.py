@@ -4,6 +4,7 @@
     python export_income_rank_monthly.py                 # 默认导出 2026-08 / 09 / 10
     python export_income_rank_monthly.py 2026-08 2026-09 2026-10
     python export_income_rank_monthly.py 2026-08 2026-09 --top 10
+    python export_income_rank_monthly.py 2026 1 2 3 --top all   # 全部人员
 """
 import os
 import sys
@@ -19,7 +20,7 @@ sys.path.insert(0, os.path.join(_HERE, 'public'))
 import ssh  # noqa: E402
 
 DEFAULT_MONTHS = ['2026-08', '2026-09', '2026-10']
-TOP_N = 5
+TOP_N = None  # None 表示导出全部人员
 
 # 角色 -> 过滤条件
 ROLES = [
@@ -37,7 +38,8 @@ def parse_months(argv):
     top_n = TOP_N
     if '--top' in argv:
         i = argv.index('--top')
-        top_n = int(argv[i + 1])
+        value = argv[i + 1]
+        top_n = None if value.lower() == 'all' else int(value)
         argv = argv[:i] + argv[i + 2:]
     if all('-' in a for a in argv):
         months = argv
@@ -154,14 +156,15 @@ for name, _ in ROLES:
 y0, m0 = months[0].split('-')
 y1, m1 = months[-1].split('-')
 span = f'{y0}年{int(m0):02d}-{int(m1):02d}月' if y0 == y1 and len(months) > 1 else '_'.join(months)
-filename = f'{span}各角色收入排行TOP{top_n}.xlsx'
+suffix = '' if top_n is None else f'TOP{top_n}'
+filename = f'{span}各角色收入排行{suffix}.xlsx'
 wb.save(filename)
 
 for name, _ in ROLES:
     rows = data[name]
     total = sum(r['total_fen'] for r in rows)
     print(f'===== {name} (共 {len(rows)} 人, 合计 {total / 100:,.2f} 元) =====')
-    for i, u in enumerate(rows[:top_n], 1):
+    for i, u in enumerate(rows[:10], 1):
         vals = '  '.join(f'{u["months"][m] / 100:>10,.2f}' for m in months)
         print(f'{i:>2}. {str(u["user_name"]):<8} {str(u["school_name"]):<18} {vals}  | {u["total_fen"] / 100:>12,.2f}')
     print()
